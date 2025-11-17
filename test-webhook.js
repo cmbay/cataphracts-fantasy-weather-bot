@@ -9,9 +9,13 @@ const {
 const { logger } = require("./src/utils/logger");
 
 // Mock webhook function for testing
-async function mockSendWebhook(regionConfig, messageContent) {
+async function mockSendWebhook(regionConfig, messageContent, webhookIndex) {
   console.log(`\n🔧 MOCK WEBHOOK SEND TO: ${regionConfig.name}`);
-  console.log(`📡 Webhook URL: ${regionConfig.webhookUrl}`);
+  console.log(
+    `📡 Webhook URL ${webhookIndex}: ${
+      regionConfig.webhookUrls[webhookIndex - 1]
+    }`
+  );
   console.log("📝 Message Content:");
   console.log("─".repeat(50));
   console.log(messageContent);
@@ -21,30 +25,8 @@ async function mockSendWebhook(regionConfig, messageContent) {
 
 async function testRegionalWeatherWebhook(regionId) {
   try {
-    // Load configuration from regions-example.json instead of regions.json
-    const fs = require("fs");
-    const path = require("path");
-
-    const exampleRegionsPath = path.join(
-      __dirname,
-      "src",
-      "config",
-      "regions-example.json"
-    );
-    const exampleConfig = JSON.parse(
-      fs.readFileSync(exampleRegionsPath, "utf8")
-    );
-
-    if (!exampleConfig.regions || !exampleConfig.regions[regionId]) {
-      throw new Error(
-        `Region '${regionId}' not found in example configuration`
-      );
-    }
-
-    const regionConfig = {
-      id: regionId,
-      ...exampleConfig.regions[regionId],
-    };
+    // Get region configuration from the merged config system
+    const regionConfig = getRegionConfig(regionId);
 
     logger.info(`Testing weather update for region: ${regionConfig.name}`);
 
@@ -71,15 +53,24 @@ async function testRegionalWeatherWebhook(regionId) {
       });
     }
 
-    // Send to mock webhook
-    const response = await mockSendWebhook(regionConfig, messageContent);
+    // Send to all mock webhooks for this region
+    const results = [];
+    for (let i = 0; i < regionConfig.webhookUrls.length; i++) {
+      const response = await mockSendWebhook(
+        regionConfig,
+        messageContent,
+        i + 1
+      );
+      results.push({ webhookIndex: i + 1, success: response.status === 204 });
+    }
 
-    if (response.status === 204) {
+    const successful = results.filter((r) => r.success).length;
+    if (successful === results.length) {
       logger.info(
-        `TEST: Weather update would be posted successfully for region: ${regionConfig.name}`
+        `TEST: Weather update would be posted successfully to all ${successful} webhook(s) for region: ${regionConfig.name}`
       );
       console.log(
-        `✅ TEST: Weather update would be posted successfully for ${regionConfig.name}!`
+        `✅ TEST: Weather update would be posted successfully to all ${successful} webhook(s) for ${regionConfig.name}!`
       );
     }
   } catch (error) {
@@ -95,38 +86,17 @@ async function testRegionalWeatherWebhook(regionId) {
 
 async function testAllRegionalWebhooks() {
   try {
-    // Load configuration from regions-example.json instead of regions.json
-    const configModule = require("./src/config/config");
-    const fs = require("fs");
-    const path = require("path");
-
-    // Override the regions config with example data
-    const exampleRegionsPath = path.join(
-      __dirname,
-      "src",
-      "config",
-      "regions-example.json"
-    );
-    const exampleConfig = JSON.parse(
-      fs.readFileSync(exampleRegionsPath, "utf8")
-    );
-    configModule.regionsConfig = exampleConfig;
-
-    const configuredRegions = Object.entries(exampleConfig.regions)
-      .filter(([_, region]) => region.webhookUrl)
-      .map(([regionId, region]) => ({
-        id: regionId,
-        ...region,
-      }));
+    // Get configured regions from the merged config system
+    const configuredRegions = getConfiguredRegions();
 
     if (configuredRegions.length === 0) {
-      logger.warn("No regions configured with webhook URLs in example file");
-      console.log("⚠️ No regions configured with webhook URLs in example file");
+      logger.warn("No regions configured with webhook URLs");
+      console.log("⚠️ No regions configured with webhook URLs");
       return;
     }
 
     logger.info(
-      `Testing weather updates for ${configuredRegions.length} regions from example config`
+      `Testing weather updates for ${configuredRegions.length} regions`
     );
 
     for (const region of configuredRegions) {

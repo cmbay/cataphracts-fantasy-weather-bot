@@ -1,11 +1,7 @@
 {
   "regions": {
     "temperate_coastal": {
-      "name": "",
-      "webhookUrls": [
-        "https://discord.com/api/webhooks/YOUR_WEBHOOK_ID_1/YOUR_TOKEN_1",
-        "https://discord.com/api/webhooks/YOUR_WEBHOOK_ID_2/YOUR_TOKEN_2"
-      ],
+      "name": "Temperate Coastal Region",
       "seasonalWeather": {
         "spring": {
           "conditions": [

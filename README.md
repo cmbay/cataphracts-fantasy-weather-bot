@@ -36,21 +36,87 @@ This keeps all weather updates organized in one thread instead of cluttering the
 4. Extract the ZIP file to your computer
 5. Remember where you saved it
 
-### Step 3: Create Your Weather Configuration
+### Step 3: Create Your Configuration Files
 
-1. In the extracted folder, find the file called `regions-example.json` in the `src/config` folder
-2. Copy this file to the main folder (next to `README.md`)
-3. Rename the copied file to `regions.json`
-4. Open `regions.json` in a text editor (Notepad works fine)
-5. Replace the example data with your own:
-   - Change `"temperate_coastal"` to your region name (use underscores instead of spaces)
-   - Change `"Temperate Coastal Region"` to your campaign's region name
-   - Replace the webhook URLs in the `webhookUrls` array with your Discord webhook URL(s) from Step 1
-   - You can have one or more webhook URLs - add more to post to multiple channels
-   - Modify the weather conditions to match your world's climate
-6. Save the file
+The bot uses three separate configuration files to keep things organized:
 
-**Important**: Make sure to use the exact webhook URL you copied from Discord, including the long string of numbers and letters at the end.
+1. **channels.json** - Contains your sensitive Discord webhook URLs
+2. **channel-assignments.json** - Maps which channels get which region's weather
+3. **regions.json** - Contains your weather data (conditions, impacts, etc.)
+
+#### Step 3a: Create channels.json
+
+1. In the `src/config` folder, copy `channels-example.json`
+2. Rename the copy to `channels.json`
+3. Open `channels.json` and replace the example URLs with your Discord webhook URLs from Step 1:
+
+```json
+{
+  "channels": {
+    "player-channel-1": {
+      "webhookUrl": "https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_TOKEN"
+    },
+    "gm-channel": {
+      "webhookUrl": "https://discord.com/api/webhooks/YOUR_GM_WEBHOOK_ID/YOUR_TOKEN"
+    }
+  }
+}
+```
+
+Give each channel a friendly name (like `"player-channel-1"` or `"gm-channel"`) - you'll use these names in the next file.
+
+#### Step 3b: Create channel-assignments.json
+
+1. In the `src/config` folder, copy `channel-assignments-example.json`
+2. Rename the copy to `channel-assignments.json`
+3. Open `channel-assignments.json` and map your regions to channels:
+
+```json
+{
+  "assignments": {
+    "temperate_coastal": {
+      "channels": ["player-channel-1"]
+    }
+  },
+  "weeklyForecastChannel": "gm-channel"
+}
+```
+
+- **channels**: Array of channel names that get daily weather for this region
+- **weeklyForecastChannel**: Single channel that gets weekly forecasts for all regions
+
+#### Step 3c: Create regions.json
+
+1. In the `src/config` folder, copy `regions-example.json`
+2. Rename the copy to `regions.json`
+3. Open `regions.json` and customize your weather data:
+
+```json
+{
+  "regions": {
+    "temperate_coastal": {
+      "name": "Coastal Region",
+      "seasonalWeather": {
+        "spring": {
+          "conditions": [
+            "Mild and sunny",
+            "Light rain",
+            "Overcast"
+          ],
+          "mechanicalImpacts": {
+            "Light rain": "Scouting range reduced by 1 hex"
+          }
+        },
+        "summer": { ... },
+        "autumn": { ... },
+        "winter": { ... }
+      }
+    }
+  }
+}
+```
+
+**Important**: Region IDs in `regions.json` must match the region IDs in `channel-assignments.json`.
 
 ### Step 4: Set Up GitHub Actions (Automated Posting)
 
@@ -63,15 +129,34 @@ This keeps all weather updates organized in one thread instead of cluttering the
 7. Drag all the files from your extracted folder into the upload area
 8. Scroll down and click "Commit changes"
 
-### Step 5: Configure Your Secrets
+### Step 5: Configure Your GitHub Secrets
+
+You need to add three secrets to GitHub:
 
 1. In your GitHub repository, click "Settings" at the top
 2. Click "Secrets and variables" in the left menu
 3. Click "Actions"
-4. Click "New repository secret"
-5. For the name, type: `REGIONS_CONFIG`
-6. For the value, copy and paste the entire contents of your `regions.json` file
-7. Click "Add secret"
+
+**Add the first secret:**
+
+1. Click "New repository secret"
+2. Name: `CHANNELS_CONFIG`
+3. Value: Copy and paste the entire contents of your `channels.json` file
+4. Click "Add secret"
+
+**Add the second secret:**
+
+1. Click "New repository secret"
+2. Name: `CHANNEL_ASSIGNMENTS_CONFIG`
+3. Value: Copy and paste the entire contents of your `channel-assignments.json` file
+4. Click "Add secret"
+
+**Add the third secret:**
+
+1. Click "New repository secret"
+2. Name: `REGIONS_CONFIG`
+3. Value: Copy and paste the entire contents of your `regions.json` file
+4. Click "Add secret"
 
 ### Step 6: Test Your Setup
 
@@ -95,230 +180,155 @@ To change these times:
 2. Edit `daily-weather.yml` and `weekly-forecast.yml` files
 3. Change the `cron` line (search online for "cron schedule generator" for help)
 
-### Optional: Weekly Forecast Setup
+## Managing Channels and Regions
 
-If you want a consolidated weekly forecast in a different channel:
+### Why Three Files?
 
-1. Create another Discord webhook following Step 1
-2. In your GitHub repository settings, add another secret called `WEEKLY_FORECAST_WEBHOOK_URL`
-3. Use the new webhook URL as the value
+The three-file system separates concerns:
 
-## Managing Webhook Channels
+- **channels.json**: Sensitive webhook URLs (never commit to Git)
+- **channel-assignments.json**: Easy-to-edit channel mappings
+- **regions.json**: Large weather data file (rarely edited)
 
-### Adding Channels to a Region
+**Benefits:**
 
-Each region can post to multiple Discord channels. This is useful when you have multiple groups playing in the same region or want weather in both a player channel and a GM channel.
+- ✅ Change which channels get weather without editing the large regions file
+- ✅ Add/remove channels quickly
+- ✅ Keep sensitive webhook URLs isolated
+- ✅ One webhook URL can be used by multiple regions
+- ✅ Multiple channels can receive the same region's weather
 
-**To add a channel to an existing region:**
+### Adding a New Region
 
-1. Open your `regions.json` file
-2. Find the region you want to add a channel to
-3. Change `webhookUrl` to `webhookUrls` (add an 's')
-4. Convert the single URL to an array with multiple URLs:
-
-**Before (single channel):**
-
-```json
-{
-  "regions": {
-    "temperate_coastal": {
-      "name": "Coastal Region",
-      "webhookUrl": "https://discord.com/api/webhooks/123456/abc123",
-      "seasonalWeather": { ... }
-    }
-  }
-}
-```
-
-**After (multiple channels):**
+**Step 1: Add to regions.json**
 
 ```json
 {
   "regions": {
-    "temperate_coastal": {
-      "name": "Coastal Region",
-      "webhookUrls": [
-        "https://discord.com/api/webhooks/123456/abc123",
-        "https://discord.com/api/webhooks/789012/def456",
-        "https://discord.com/api/webhooks/345678/ghi789"
-      ],
-      "seasonalWeather": { ... }
-    }
-  }
-}
-```
-
-5. Save the file
-6. Update your GitHub secret `REGIONS_CONFIG` with the new content
-7. Weather will now post to all channels for that region
-
-**Note:** The old `webhookUrl` format (single string) still works for backward compatibility, but `webhookUrls` (array) is recommended.
-
-### Moving Channels Between Regions
-
-If you need to move a Discord channel from one region to another (for example, if your campaign party travels to a different climate zone):
-
-**Step 1: Find the webhook URL to move**
-
-- Open your `regions.json` file
-- Locate the webhook URL in the current region's `webhookUrls` array
-- Copy the URL
-
-**Step 2: Remove from old region**
-
-```json
-"old_region": {
-  "name": "Old Region",
-  "webhookUrls": [
-    "https://discord.com/api/webhooks/123456/abc123",
-    "https://discord.com/api/webhooks/REMOVE_THIS/xyz789"  // ← Remove this one
-  ],
-  "seasonalWeather": { ... }
-}
-```
-
-**Step 3: Add to new region**
-
-```json
-"new_region": {
-  "name": "New Region",
-  "webhookUrls": [
-    "https://discord.com/api/webhooks/789012/def456",
-    "https://discord.com/api/webhooks/REMOVE_THIS/xyz789"  // ← Add it here
-  ],
-  "seasonalWeather": { ... }
-}
-```
-
-**Step 4: Update GitHub**
-
-- Save your `regions.json` file
-- Go to your GitHub repository → Settings → Secrets and variables → Actions
-- Click on `REGIONS_CONFIG`
-- Click "Update secret"
-- Paste the entire contents of your updated `regions.json` file
-- Click "Update secret"
-
-The channel will immediately start receiving weather for the new region on the next scheduled update.
-
-### Quick Reference: Webhook URL Management
-
-**Get a webhook URL from Discord:**
-
-1. Channel settings (⚙️) → Integrations → Webhooks → Create/Copy
-
-**Multiple channels in one region:**
-
-```json
-"webhookUrls": [
-  "https://discord.com/api/webhooks/URL1",
-  "https://discord.com/api/webhooks/URL2"
-]
-```
-
-**Single channel (backward compatible):**
-
-```json
-"webhookUrl": "https://discord.com/api/webhooks/URL"
-```
-
-**Remove a channel:**
-
-- Delete its webhook URL from the `webhookUrls` array
-- Update the `REGIONS_CONFIG` secret on GitHub
-
-**Duplicate weather to test channel:**
-
-- Add your test webhook URL to the same region's `webhookUrls` array
-- Both channels will receive identical weather updates
-
-### Troubleshooting
-
-**No weather appears in Discord:**
-
-- Check that your webhook URL is correct and starts with `https://discord.com/api/webhooks/`
-- Make sure the Discord channel allows webhooks
-- Verify your `regions.json` file is valid JSON (use an online JSON validator)
-- Test your webhook URL by pasting it in a browser - you should see a message about webhook methods
-
-**Weather updates at wrong time:**
-
-- Remember that GitHub Actions uses UTC time
-- Convert your desired time to UTC using an online converter
-
-**Same weather every day:**
-
-- Make sure each season has multiple different weather conditions
-- The system picks randomly from your list
-
-**GitHub Actions not running:**
-
-- Check the "Actions" tab in your repository for error messages
-- Verify your secrets are set correctly
-
-## Setup
-
-### 1. Create Discord Webhooks
-
-1. Go to Discord channel settings → Integrations → Webhooks
-2. Create webhook, copy URL
-3. Optional: Create second webhook for weekly forecasts
-
-### 2. Configure Regions
-
-Create `regions.json` in project root:
-
-```json
-{
-  "regions": {
-    "my_region": {
-      "name": "My Campaign Region",
-      "webhookUrls": [
-        "https://discord.com/api/webhooks/YOUR_WEBHOOK_URL_1",
-        "https://discord.com/api/webhooks/YOUR_WEBHOOK_URL_2"
-      ],
+    "existing_region": { ... },
+    "new_region": {
+      "name": "New Region Name",
       "seasonalWeather": {
-        "spring": {
-          "conditions": ["Mild and sunny", "Light rain", "Overcast"],
-          "mechanicalImpacts": {
-            "Light rain": "Scouting range reduced by 1 hex"
-          }
-        },
-        "summer": {
-          "conditions": [
-            "Warm and sunny",
-            "Hot with clear skies",
-            "Thunderstorms"
-          ],
-          "mechanicalImpacts": {
-            "Thunderstorms": "Movement speed reduced by 1 hex"
-          }
-        },
-        "autumn": {
-          "conditions": ["Cool and crisp", "Overcast with rain", "Windy"],
-          "mechanicalImpacts": {
-            "Overcast with rain": "Scouting range reduced by 1 hex"
-          }
-        },
-        "winter": {
-          "conditions": [
-            "Cold and frosty",
-            "Overcast with sleet",
-            "Light snow"
-          ],
-          "mechanicalImpacts": {
-            "Overcast with sleet": "Movement speed reduced by 1 hex"
-          }
-        }
+        "spring": { "conditions": [...] },
+        "summer": { "conditions": [...] },
+        "autumn": { "conditions": [...] },
+        "winter": { "conditions": [...] }
       }
     }
   }
 }
 ```
 
-**Note:** You can use a single webhook URL with `"webhookUrl": "..."` (backward compatible) or multiple URLs with `"webhookUrls": [...]` array format.
+**Step 2: Assign channels in channel-assignments.json**
 
-### 3. Local Testing
+```json
+{
+  "assignments": {
+    "existing_region": { ... },
+    "new_region": {
+      "channels": ["player-channel-1"]
+    }
+  }
+}
+```
+
+**Step 3: Update GitHub secrets** with the new file contents.
+
+### Adding a New Discord Channel
+
+**Step 1: Create webhook in Discord** (see Step 1 above)
+
+**Step 2: Add to channels.json**
+
+```json
+{
+  "channels": {
+    "existing-channel": { ... },
+    "new-player-channel": {
+      "webhookUrl": "https://discord.com/api/webhooks/NEW_WEBHOOK_URL"
+    }
+  }
+}
+```
+
+**Step 3: Assign to a region in channel-assignments.json**
+
+```json
+{
+  "assignments": {
+    "temperate_coastal": {
+      "channels": ["existing-channel", "new-player-channel"]
+    }
+  }
+}
+```
+
+Now both channels will receive weather for the `temperate_coastal` region.
+
+### Moving a Channel to a Different Region
+
+Just edit `channel-assignments.json`:
+
+**Before:**
+
+```json
+{
+  "assignments": {
+    "old_region": {
+      "channels": ["player-channel-1"]
+    }
+  }
+}
+```
+
+**After:**
+
+```json
+{
+  "assignments": {
+    "new_region": {
+      "channels": ["player-channel-1"]
+    }
+  }
+}
+```
+
+Update the `CHANNEL_ASSIGNMENTS_CONFIG` secret on GitHub, and the channel will immediately start receiving the new region's weather.
+
+### Sharing Webhooks Between Regions
+
+You can reuse webhook URLs for multiple regions:
+
+**channels.json:**
+
+```json
+{
+  "channels": {
+    "shared-weather-hub": {
+      "webhookUrl": "https://discord.com/api/webhooks/SHARED_URL"
+    }
+  }
+}
+```
+
+**channel-assignments.json:**
+
+```json
+{
+  "assignments": {
+    "north_region": {
+      "channels": ["shared-weather-hub"]
+    },
+    "south_region": {
+      "channels": ["shared-weather-hub"]
+    }
+  }
+}
+```
+
+Both regions will post to the same Discord channel.
+
+## Local Testing
 
 ```bash
 npm install
@@ -326,89 +336,96 @@ npm test          # Test daily weather
 npm run test-weekly  # Test weekly forecast
 ```
 
-### 4. GitHub Actions Setup
+The test commands will use your local `channels.json`, `channel-assignments.json`, and `regions.json` files.
 
-1. Fork this repository
-2. Go to Settings → Secrets and variables → Actions
-3. Add secret: `REGIONS_CONFIG` with your complete `regions.json` content
-4. Optional: Add `WEEKLY_FORECAST_WEBHOOK_URL` for consolidated weekly forecasts
+## Configuration Reference
 
-## Usage
+### channels.json
 
-## Usage
-
-```bash
-npm start         # Send daily weather update
-npm run weekly    # Send weekly forecast
-npm test          # Test daily weather locally
-npm run test-weekly  # Test weekly forecast locally
-```
-
-## Configuration
-
-### Schedules
-
-Default GitHub Actions schedule:
-
-- Daily weather: 12:00 PM UTC
-- Weekly forecast: Saturday 00:00 UTC
-
-Edit `.github/workflows/daily-weather.yml` and `.github/workflows/weekly-forecast.yml` to change timing.
-
-### Weather Patterns
-
-Weather conditions are defined in `seasonalWeather` objects within your `regions.json`. Each season requires:
-
-- `conditions`: Array of weather descriptions (biased toward earlier items)
-- `mechanicalImpacts` (optional): Object mapping specific conditions to game effects
-
-**Example:**
+Maps friendly channel IDs to Discord webhook URLs.
 
 ```json
-"spring": {
-  "conditions": [
-    "Mild and sunny",        // Most common
-    "Partly cloudy",         // Common
-    "Light rain",            // Less common
-    "Thunderstorms"          // Rare
-  ],
-  "mechanicalImpacts": {
-    "Light rain": "Scouting range reduced by 1 hex",
-    "Thunderstorms": "Movement speed reduced by 1 hex, scouting range reduced by 2 hexes"
+{
+  "channels": {
+    "channel-id": {
+      "webhookUrl": "https://discord.com/api/webhooks/ID/TOKEN"
+    }
   }
 }
 ```
 
-### Example Region Template
+- **Location**: `src/config/channels.json` (gitignored - contains sensitive URLs)
+- **Template**: `src/config/channels-example.json`
 
-Copy from `src/config/regions-example.json` for reference climate types:
+### channel-assignments.json
 
-- Temperate coastal (Western European)
-- Desert (arid)
-- Tropical (monsoon)
-- Arctic (polar)
-- Mountain (alpine)
+Maps region IDs to channel IDs.
 
-### Environment Variables
+```json
+{
+  "assignments": {
+    "region_id": {
+      "channels": ["channel-id-1", "channel-id-2"]
+    }
+  },
+  "weeklyForecastChannel": "gm-channel"
+}
+```
 
-**Required:**
+- **channels**: Array of channel IDs that receive daily weather
+- **weeklyForecastChannel**: Single channel ID for weekly consolidated forecasts
+- **Location**: `src/config/channel-assignments.json` (gitignored but safe to version)
+- **Template**: `src/config/channel-assignments-example.json`
 
-- `REGIONS_CONFIG`: JSON string of your regions configuration (GitHub Actions only)
+### regions.json
 
-**Optional:**
+Contains weather data for each region.
 
-- `WEEKLY_FORECAST_WEBHOOK_URL`: Consolidated weekly forecast webhook
+```json
+{
+  "regions": {
+    "region_id": {
+      "name": "Region Display Name",
+      "seasonalWeather": {
+        "spring": {
+          "conditions": ["Condition 1", "Condition 2"],
+          "mechanicalImpacts": {
+            "Condition 1": "Game effect description"
+          }
+        },
+        "summer": { ... },
+        "autumn": { ... },
+        "winter": { ... }
+      }
+    }
+  }
+}
+```
 
-**Local Development:**
-Create `.env` file with webhook URLs or use `regions.json` directly.
+- **name**: Display name for the region
+- **seasonalWeather**: Weather patterns for each season
+  - **conditions**: Array of weather descriptions (earlier items more likely)
+  - **mechanicalImpacts**: Optional object mapping conditions to game effects
+- **Location**: `src/config/regions.json` (gitignored - large file)
+- **Template**: `src/config/regions-example.json`
+
+## GitHub Actions Environment Variables
+
+For GitHub Actions, set these secrets:
+
+- **CHANNELS_CONFIG**: Complete `channels.json` as JSON string
+- **CHANNEL_ASSIGNMENTS_CONFIG**: Complete `channel-assignments.json` as JSON string
+- **REGIONS_CONFIG**: Complete `regions.json` as JSON string
+- **WEEKLY_FORECAST_WEBHOOK_URL** (optional): Direct webhook URL for weekly forecasts (overrides channel-assignments)
 
 ## How It Works
 
-- Weather is deterministic: same date produces same weather for each region
-- Seasons change automatically based on calendar date
+- Weather is **deterministic**: same date produces same weather for each region
+- Seasons change automatically based on calendar date (Northern Hemisphere)
 - Each region has unique weather patterns defined in configuration
 - Weather generation uses seeded randomization for consistency
 - Discord messages include weather-appropriate emojis
+- Configuration files are merged at runtime to resolve channels
 
 ## Files
 
@@ -417,12 +434,39 @@ Create `.env` file with webhook URLs or use `regions.json` directly.
 - `test-webhook.js` - Local daily testing
 - `test-weekly.js` - Local weekly testing
 - `src/services/weatherService.js` - Weather generation logic
-- `src/config/config.js` - Configuration management
-- `regions.json` - Regional weather definitions (create this)
+- `src/config/config.js` - Configuration loading and merging
+- `src/config/channels.json` - Webhook URLs (create this, gitignored)
+- `src/config/channel-assignments.json` - Region-to-channel mappings (create this, gitignored)
+- `src/config/regions.json` - Weather data (create this, gitignored)
 
 ## Troubleshooting
 
-**No weather posted**: Check webhook URL and Discord channel permissions
-**Wrong timing**: Verify cron expressions in workflow files
-**Same weather daily**: Confirm regions have multiple weather conditions
-**Local testing fails**: Run `npm install` and check `.env` or `regions.json`
+**No weather posted**:
+
+- Check webhook URLs in `channels.json`
+- Verify channel IDs match between `channels.json` and `channel-assignments.json`
+- Verify region IDs match between `regions.json` and `channel-assignments.json`
+- Check Discord channel permissions
+
+**Wrong timing**:
+
+- Verify cron expressions in workflow files
+- Remember GitHub Actions uses UTC time
+
+**Configuration not found**:
+
+- Ensure all three config files exist in `src/config/`
+- Verify GitHub secrets are set correctly
+- Check file names match exactly (case-sensitive)
+
+**Channel not receiving weather**:
+
+- Verify region has the channel in `channel-assignments.json`
+- Check webhook URL is correct in `channels.json`
+- Ensure region has seasonal weather data in `regions.json`
+
+**Local testing fails**:
+
+- Run `npm install`
+- Ensure all three config files exist locally
+- Check JSON syntax (use an online JSON validator)

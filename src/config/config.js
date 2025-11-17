@@ -2,63 +2,134 @@ require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
 
-// Load regional configurations with flexible file discovery
-const loadRegionsConfig = () => {
-  // 1. Try to load from REGIONS_CONFIG environment variable (for GitHub Actions)
-  if (process.env.REGIONS_CONFIG) {
+// Generic function to load a JSON config file with flexible file discovery
+const loadConfig = (envVarName, fileName, exampleFileName) => {
+  // 1. Try to load from environment variable (for GitHub Actions)
+  if (process.env[envVarName]) {
     try {
-      const config = JSON.parse(process.env.REGIONS_CONFIG);
+      const config = JSON.parse(process.env[envVarName]);
       console.log(
-        `[CONFIG] Loaded regions configuration from REGIONS_CONFIG environment variable`
+        `[CONFIG] Loaded ${fileName} from ${envVarName} environment variable`
       );
       return config;
     } catch (error) {
       console.warn(
-        `[CONFIG] Failed to parse REGIONS_CONFIG environment variable: ${error.message}`
+        `[CONFIG] Failed to parse ${envVarName} environment variable: ${error.message}`
       );
     }
   }
 
-  // 2. Priority order for regions configuration files
+  // 2. Priority order for configuration files
   const possiblePaths = [
     // Custom user file (highest priority)
-    path.join(process.cwd(), "regions.json"),
-    path.join(process.cwd(), "config", "regions.json"),
-    path.join(process.cwd(), "src", "config", "custom-regions.json"),
+    path.join(process.cwd(), fileName),
+    path.join(process.cwd(), "config", fileName),
+    path.join(process.cwd(), "src", "config", fileName),
 
     // Default example file (fallback)
-    path.join(__dirname, "regions.json"),
-    path.join(__dirname, "regions-example.json"),
+    path.join(__dirname, fileName),
+    path.join(__dirname, exampleFileName),
   ];
 
-  for (const regionsPath of possiblePaths) {
+  for (const configPath of possiblePaths) {
     try {
-      if (fs.existsSync(regionsPath)) {
-        const config = JSON.parse(fs.readFileSync(regionsPath, "utf8"));
-        console.log(
-          `[CONFIG] Loaded regions configuration from: ${regionsPath}`
-        );
+      if (fs.existsSync(configPath)) {
+        const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+        console.log(`[CONFIG] Loaded ${fileName} from: ${configPath}`);
         return config;
       }
     } catch (error) {
       console.warn(
-        `[CONFIG] Failed to load regions from ${regionsPath}: ${error.message}`
+        `[CONFIG] Failed to load ${fileName} from ${configPath}: ${error.message}`
       );
     }
   }
 
-  // No regions file found - return empty config
-  console.log("[CONFIG] No regions configuration found");
-  return { regions: {} };
+  // No config file found - return empty config
+  console.log(`[CONFIG] No ${fileName} configuration found`);
+  return null;
 };
 
-let regionsConfig = loadRegionsConfig();
+// Load all three configuration files
+const channelsConfig = loadConfig(
+  "CHANNELS_CONFIG",
+  "channels.json",
+  "channels-example.json"
+) || { channels: {} };
+
+const channelAssignments = loadConfig(
+  "CHANNEL_ASSIGNMENTS_CONFIG",
+  "channel-assignments.json",
+  "channel-assignments-example.json"
+) || { assignments: {}, weeklyForecastChannel: null };
+
+const regionsConfig = loadConfig(
+  "REGIONS_CONFIG",
+  "regions.json",
+  "regions-example.json"
+) || { regions: {} };
+
+// Merge configurations: resolve channel IDs to webhook URLs for each region
+const mergeConfigurations = () => {
+  const merged = { regions: {} };
+
+  // For each region in regions.json
+  Object.entries(regionsConfig.regions || {}).forEach(
+    ([regionId, regionData]) => {
+      // Get channel assignments for this region
+      const assignments = channelAssignments.assignments[regionId] || {};
+
+      // Resolve channel IDs to webhook URLs
+      const webhookUrls = (assignments.channels || [])
+        .map((channelId) => {
+          const channel = channelsConfig.channels[channelId];
+          if (!channel || !channel.webhookUrl) {
+            console.warn(
+              `[CONFIG] Channel '${channelId}' not found in channels.json for region '${regionId}'`
+            );
+            return null;
+          }
+          return channel.webhookUrl;
+        })
+        .filter((url) => url); // Remove null values
+
+      // Merge region data with resolved webhook URLs
+      merged.regions[regionId] = {
+        ...regionData,
+        id: regionId,
+        webhookUrls,
+      };
+    }
+  );
+
+  return merged;
+};
+
+// Create merged configuration
+let mergedConfig = mergeConfigurations();
 
 // Build simplified config - only need the weekly forecast webhook URL
 const config = {
   // Consolidated weekly forecast webhook (all regions in one channel)
+  // This can be overridden by WEEKLY_FORECAST_WEBHOOK_URL environment variable
+  // or derived from channelAssignments.weeklyForecastChannel
   WEEKLY_FORECAST_WEBHOOK_URL: process.env.WEEKLY_FORECAST_WEBHOOK_URL,
 };
+
+// If WEEKLY_FORECAST_WEBHOOK_URL env var is not set, try to resolve from channel assignments
+if (
+  !config.WEEKLY_FORECAST_WEBHOOK_URL &&
+  channelAssignments.weeklyForecastChannel
+) {
+  const weeklyChannel =
+    channelsConfig.channels[channelAssignments.weeklyForecastChannel];
+  if (weeklyChannel && weeklyChannel.webhookUrl) {
+    config.WEEKLY_FORECAST_WEBHOOK_URL = weeklyChannel.webhookUrl;
+    console.log(
+      `[CONFIG] Using weekly forecast channel: ${channelAssignments.weeklyForecastChannel}`
+    );
+  }
+}
 
 // Function to validate specific environment variables
 const validateConfig = (requiredVars = [], optionalVars = []) => {
@@ -79,15 +150,12 @@ const validateConfig = (requiredVars = [], optionalVars = []) => {
 
 // Function to get all configured regions
 const getConfiguredRegions = () => {
-  if (!regionsConfig.regions) return [];
+  if (!mergedConfig.regions) return [];
 
-  return Object.entries(regionsConfig.regions)
+  return Object.entries(mergedConfig.regions)
     .filter(([_, region]) => {
-      // Support both webhookUrls (array) and webhookUrl (single, for backward compatibility)
-      return (
-        (Array.isArray(region.webhookUrls) && region.webhookUrls.length > 0) ||
-        region.webhookUrl
-      );
+      // Region must have at least one webhook URL configured
+      return Array.isArray(region.webhookUrls) && region.webhookUrls.length > 0;
     })
     .map(([regionId, region]) => ({
       id: regionId,
@@ -97,11 +165,11 @@ const getConfiguredRegions = () => {
 
 // Function to get a specific region configuration
 const getRegionConfig = (regionId) => {
-  if (!regionsConfig.regions || !regionsConfig.regions[regionId]) {
+  if (!mergedConfig.regions || !mergedConfig.regions[regionId]) {
     throw new Error(`Region '${regionId}' not found in configuration`);
   }
 
-  const region = regionsConfig.regions[regionId];
+  const region = mergedConfig.regions[regionId];
 
   // Normalize webhookUrls to always be an array
   let webhookUrls = [];
@@ -109,9 +177,6 @@ const getRegionConfig = (regionId) => {
     webhookUrls = region.webhookUrls.filter(
       (url) => url && typeof url === "string"
     );
-  } else if (region.webhookUrl && typeof region.webhookUrl === "string") {
-    // Backward compatibility: convert single webhookUrl to array
-    webhookUrls = [region.webhookUrl];
   }
 
   // Check if any webhook URLs are configured
@@ -149,16 +214,6 @@ const validateRegionDefinition = (regionId, regionData) => {
   // Check required fields
   if (!regionData.name) {
     errors.push(`Region '${regionId}' missing required field: name`);
-  }
-  // Support both webhookUrls (array) and webhookUrl (single, for backward compatibility)
-  const hasWebhookUrls =
-    Array.isArray(regionData.webhookUrls) && regionData.webhookUrls.length > 0;
-  const hasWebhookUrl =
-    regionData.webhookUrl && typeof regionData.webhookUrl === "string";
-  if (!hasWebhookUrls && !hasWebhookUrl) {
-    errors.push(
-      `Region '${regionId}' missing required field: webhookUrls (array) or webhookUrl (string)`
-    );
   }
 
   // Check seasonal weather structure
@@ -232,10 +287,6 @@ const validateAllRegions = () => {
 const createRegionTemplate = (regionId, regionName) => {
   return {
     name: regionName,
-    webhookUrls: [
-      "https://discord.com/api/webhooks/YOUR_WEBHOOK_ID_1/YOUR_WEBHOOK_TOKEN_1",
-      "https://discord.com/api/webhooks/YOUR_WEBHOOK_ID_2/YOUR_WEBHOOK_TOKEN_2",
-    ],
     seasonalWeather: {
       spring: {
         conditions: [

@@ -5,6 +5,7 @@ const {
 const {
   getConfiguredRegions,
   getRegionConfig,
+  getWeeklyForecastWebhookUrl,
 } = require("./src/config/config");
 const { logger } = require("./src/utils/logger");
 
@@ -34,35 +35,31 @@ async function mockSendDiscordMessage(webhookUrl, content) {
 
 async function testConsolidatedWeeklyForecastWebhook() {
   try {
-    // Load configuration from regions-example.json instead of regions.json
-    const fs = require("fs");
-    const path = require("path");
+    // Get weekly forecast webhook URL
+    const weeklyForecastUrl = getWeeklyForecastWebhookUrl();
 
-    const exampleRegionsPath = path.join(
-      __dirname,
-      "src",
-      "config",
-      "regions-example.json"
-    );
-    const exampleConfig = JSON.parse(
-      fs.readFileSync(exampleRegionsPath, "utf8")
-    );
+    // If no weekly forecast URL configured, use a mock URL for testing
+    const mockWeeklyUrl =
+      weeklyForecastUrl ||
+      "https://discord.com/api/webhooks/EXAMPLE_WEEKLY_WEBHOOK/test";
 
-    const configuredRegions = Object.entries(exampleConfig.regions)
-      .filter(([_, region]) => region.webhookUrl)
-      .map(([regionId, region]) => ({
-        id: regionId,
-        ...region,
-      }));
+    if (!weeklyForecastUrl) {
+      console.log(
+        "⚠️ No weekly forecast webhook URL configured, using mock URL for testing"
+      );
+    }
+
+    // Get configured regions from the merged config system
+    const configuredRegions = getConfiguredRegions();
 
     if (configuredRegions.length === 0) {
-      logger.warn("No regions configured with webhook URLs in example file");
-      console.log("⚠️ No regions configured with webhook URLs in example file");
+      logger.warn("No regions configured with webhook URLs");
+      console.log("⚠️ No regions configured with webhook URLs");
       return;
     }
 
     logger.info(
-      `Testing consolidated weekly forecast for ${configuredRegions.length} regions from example config`
+      `Testing consolidated weekly forecast for ${configuredRegions.length} regions`
     );
 
     // Build consolidated forecast message
@@ -71,11 +68,7 @@ async function testConsolidatedWeeklyForecastWebhook() {
 
     for (const region of configuredRegions) {
       try {
-        const regionConfig = {
-          id: region.id,
-          name: region.name,
-          seasonalWeather: region.seasonalWeather,
-        };
+        const regionConfig = getRegionConfig(region.id);
 
         const weeklyForecast = getRegionalWeeklyForecast(regionConfig);
 
@@ -122,8 +115,6 @@ async function testConsolidatedWeeklyForecastWebhook() {
       "*Consolidated weather forecast for all campaign regions*";
 
     // Send message(s) to mock Discord webhook
-    const mockWeeklyUrl =
-      "https://discord.com/api/webhooks/EXAMPLE_WEEKLY_WEBHOOK/test";
     const responses = await mockSendDiscordMessage(
       mockWeeklyUrl,
       consolidatedMessage

@@ -15,9 +15,11 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 
-# Regional configuration (contains sensitive webhook URLs)
-# Use REGIONS_CONFIG environment variable for GitHub Actions instead
+# Configuration files containing sensitive webhook URLs
+# Use environment variables for GitHub Actions instead
 # See GITHUB-SECRETS-SETUP.md for deployment instructions
+channels.json
+channel-assignments.json
 regions.json
 
 # OS files
