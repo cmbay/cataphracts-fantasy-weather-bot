@@ -13,9 +13,9 @@ function seededRandom(seed) {
 
 // Generate a seed from a date and region (YYYY-MM-DD format)
 function dateToSeed(date, regionId = "default") {
-  const year = date.getFullYear();
-  const month = date.getMonth() + 1; // 0-based to 1-based
-  const day = date.getDate();
+  const year = date.getUTCFullYear();
+  const month = date.getUTCMonth() + 1; // 0-based to 1-based
+  const day = date.getUTCDate();
 
   // Create a unique seed by combining year, month, day, and region
   // Use simple string hash for region to ensure different regions have different weather
@@ -32,7 +32,7 @@ function dateToSeed(date, regionId = "default") {
 
 // Determine current season based on date
 const getSeason = (date) => {
-  const month = date.getMonth() + 1; // getMonth() returns 0-11
+  const month = date.getUTCMonth() + 1; // getUTCMonth() returns 0-11
 
   if (month >= 3 && month <= 5) return "spring";
   if (month >= 6 && month <= 8) return "summer";
@@ -110,11 +110,13 @@ const getWeatherForDate = (
   const formattedDate = date.toLocaleDateString("en-US", {
     month: "long",
     day: "numeric",
+    timeZone: "UTC",
   });
 
   // Get day of week
   const dayOfWeek = date.toLocaleDateString("en-US", {
     weekday: "long",
+    timeZone: "UTC",
   });
 
   return {
@@ -132,8 +134,11 @@ const getWeeklyForecast = (seasonalWeatherConfig, regionId = "default") => {
 
   // Generate forecast for the next 7 days
   for (let i = 0; i < 7; i++) {
-    const forecastDate = new Date(today);
-    forecastDate.setDate(today.getDate() + i);
+    const forecastDate = new Date(Date.UTC(
+      today.getUTCFullYear(),
+      today.getUTCMonth(),
+      today.getUTCDate() + i
+    ));
     forecast.push(
       getWeatherForDate(forecastDate, seasonalWeatherConfig, regionId)
     );
