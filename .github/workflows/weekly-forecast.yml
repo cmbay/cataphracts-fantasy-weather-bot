@@ -24,7 +24,13 @@ jobs:
 
       - name: Send weekly weather forecast
         env:
-          # Regional configuration (JSON string containing all regions with webhook URLs)
+          # Channel webhook URLs mapped to channel IDs
+          CHANNELS_CONFIG: ${{ secrets.CHANNELS_CONFIG }}
+
+          # Channel assignments mapping regions to channel IDs
+          CHANNEL_ASSIGNMENTS_CONFIG: ${{ secrets.CHANNEL_ASSIGNMENTS_CONFIG }}
+
+          # Regional weather configuration
           REGIONS_CONFIG: ${{ secrets.REGIONS_CONFIG }}
 
           # Weekly forecast webhook URL (for consolidated weekly forecasts)
