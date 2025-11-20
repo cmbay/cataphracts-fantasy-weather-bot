@@ -30,14 +30,28 @@ function dateToSeed(date, regionId = "default") {
 
 // No legacy day/night or derived impacts support
 
-// Determine current season based on date
+// Determine current season based on date (Northern Hemisphere solar seasons)
 const getSeason = (date) => {
   const month = date.getUTCMonth() + 1; // getUTCMonth() returns 0-11
+  const day = date.getUTCDate();
 
-  if (month >= 3 && month <= 5) return "spring";
-  if (month >= 6 && month <= 8) return "summer";
-  if (month >= 9 && month <= 11) return "autumn";
-  return "winter"; // December, January, February
+  // Spring: March 20 - June 20
+  if (month === 3 && day >= 20) return "spring";
+  if (month === 4 || month === 5) return "spring";
+  if (month === 6 && day < 21) return "spring";
+
+  // Summer: June 21 - September 21
+  if (month === 6 && day >= 21) return "summer";
+  if (month === 7 || month === 8) return "summer";
+  if (month === 9 && day < 22) return "summer";
+
+  // Autumn: September 22 - December 20
+  if (month === 9 && day >= 22) return "autumn";
+  if (month === 10 || month === 11) return "autumn";
+  if (month === 12 && day < 21) return "autumn";
+
+  // Winter: December 21 - March 19
+  return "winter";
 };
 
 // Helper: bias selection so earlier items are more likely
