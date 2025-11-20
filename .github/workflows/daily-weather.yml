@@ -4,7 +4,7 @@ on:
   schedule:
     # Run daily at 12:00 AM New York time (Eastern Time)
     # This is 5:00 AM UTC during EST, 4:00 AM UTC during EDT
-    - cron: "0 5 * * *"
+    - cron: "0 13 * * *"
 
   # Allow manual triggering for testing
   workflow_dispatch:
