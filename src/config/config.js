@@ -1,6 +1,7 @@
 require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
+const { fetchAllConfig } = require("../services/googleSheetsService");
 
 // Generic function to load a JSON config file with flexible file discovery
 const loadConfig = (envVarName, fileName, exampleFileName) => {
@@ -50,27 +51,109 @@ const loadConfig = (envVarName, fileName, exampleFileName) => {
   return null;
 };
 
-// Load all three configuration files
-const channelsConfig = loadConfig(
-  "CHANNELS_CONFIG",
-  "channels.json",
-  "channels-example.json"
-) || { channels: {} };
+// Configuration loading state
+let configLoaded = false;
+let configLoadPromise = null;
 
-const channelAssignments = loadConfig(
-  "CHANNEL_ASSIGNMENTS_CONFIG",
-  "channel-assignments.json",
-  "channel-assignments-example.json"
-) || { assignments: {}, weeklyForecastChannel: null };
+// Google Sheets configuration
+const GOOGLE_SERVICE_ACCOUNT_KEY = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
+const GOOGLE_SPREADSHEET_ID = process.env.GOOGLE_SPREADSHEET_ID;
 
+// Storage for dynamically loaded config
+let channelsConfig = { channels: {} };
+let channelAssignments = { assignments: {}, weeklyForecastChannel: null };
+
+// Load regions config as before (from environment variable or file)
 const regionsConfig = loadConfig(
   "REGIONS_CONFIG",
   "regions.json",
   "regions-example.json"
 ) || { regions: {} };
 
+/**
+ * Load file-based configuration as fallback
+ */
+function loadFileBasedConfig() {
+  channelsConfig = loadConfig(
+    "CHANNELS_CONFIG",
+    "channels.json",
+    "channels-example.json"
+  ) || { channels: {} };
+
+  channelAssignments = loadConfig(
+    "CHANNEL_ASSIGNMENTS_CONFIG",
+    "channel-assignments.json",
+    "channel-assignments-example.json"
+  ) || { assignments: {}, weeklyForecastChannel: null };
+}
+
+/**
+ * Load channels and channel assignments from Google Sheets
+ * Falls back to file-based config if Google Sheets is not configured or fails
+ * This function is called once and caches the result
+ */
+async function loadGoogleSheetsConfig() {
+  // Return cached promise if already loading
+  if (configLoadPromise) {
+    return configLoadPromise;
+  }
+
+  // Return immediately if already loaded
+  if (configLoaded) {
+    return;
+  }
+
+  // Create loading promise to prevent concurrent calls
+  configLoadPromise = (async () => {
+    // Check if Google Sheets is configured
+    if (!GOOGLE_SERVICE_ACCOUNT_KEY || !GOOGLE_SPREADSHEET_ID) {
+      console.log(
+        "[CONFIG] Google Sheets not configured, using file-based config"
+      );
+      loadFileBasedConfig();
+      configLoaded = true;
+      return;
+    }
+
+    // Try to load from Google Sheets
+    try {
+      console.log("[CONFIG] Loading configuration from Google Sheets");
+      const {
+        channelsConfig: loadedChannels,
+        assignmentsConfig: loadedAssignments,
+      } = await fetchAllConfig(
+        GOOGLE_SPREADSHEET_ID,
+        GOOGLE_SERVICE_ACCOUNT_KEY
+      );
+
+      channelsConfig = loadedChannels;
+      channelAssignments = loadedAssignments;
+
+      console.log(
+        `[CONFIG] Successfully loaded ${
+          Object.keys(channelsConfig.channels || {}).length
+        } channels from Google Sheets`
+      );
+    } catch (error) {
+      console.error(
+        `[CONFIG] Failed to load from Google Sheets: ${error.message}`
+      );
+      console.log("[CONFIG] Falling back to file-based configuration");
+      loadFileBasedConfig();
+    }
+
+    configLoaded = true;
+  })();
+
+  await configLoadPromise;
+  configLoadPromise = null;
+}
+
 // Merge configurations: resolve channel IDs to webhook URLs for each region
-const mergeConfigurations = () => {
+async function mergeConfigurations() {
+  // Ensure config is loaded
+  await loadGoogleSheetsConfig();
+
   const merged = { regions: {} };
 
   // For each region in regions.json
@@ -85,7 +168,7 @@ const mergeConfigurations = () => {
           const channel = channelsConfig.channels[channelId];
           if (!channel || !channel.webhookUrl) {
             console.warn(
-              `[CONFIG] Channel '${channelId}' not found in channels.json for region '${regionId}'`
+              `[CONFIG] Channel '${channelId}' not found in channels config for region '${regionId}'`
             );
             return null;
           }
@@ -103,10 +186,10 @@ const mergeConfigurations = () => {
   );
 
   return merged;
-};
+}
 
-// Create merged configuration
-let mergedConfig = mergeConfigurations();
+// Merged configuration cache
+let mergedConfig = null;
 
 // Build simplified config - only need the weekly forecast webhook URL
 const config = {
@@ -116,19 +199,28 @@ const config = {
   WEEKLY_FORECAST_WEBHOOK_URL: process.env.WEEKLY_FORECAST_WEBHOOK_URL,
 };
 
-// If WEEKLY_FORECAST_WEBHOOK_URL env var is not set, try to resolve from channel assignments
-if (
-  !config.WEEKLY_FORECAST_WEBHOOK_URL &&
-  channelAssignments.weeklyForecastChannel
-) {
-  const weeklyChannel =
-    channelsConfig.channels[channelAssignments.weeklyForecastChannel];
-  if (weeklyChannel && weeklyChannel.webhookUrl) {
-    config.WEEKLY_FORECAST_WEBHOOK_URL = weeklyChannel.webhookUrl;
-    console.log(
-      `[CONFIG] Using weekly forecast channel: ${channelAssignments.weeklyForecastChannel}`
-    );
+// Helper to get weekly forecast URL (async to ensure config is loaded)
+async function getWeeklyForecastWebhookUrlInternal() {
+  await loadGoogleSheetsConfig();
+
+  // If env var is set, use that
+  if (config.WEEKLY_FORECAST_WEBHOOK_URL) {
+    return config.WEEKLY_FORECAST_WEBHOOK_URL;
   }
+
+  // Otherwise, try to resolve from channel assignments
+  if (channelAssignments.weeklyForecastChannel) {
+    const weeklyChannel =
+      channelsConfig.channels[channelAssignments.weeklyForecastChannel];
+    if (weeklyChannel && weeklyChannel.webhookUrl) {
+      console.log(
+        `[CONFIG] Using weekly forecast channel: ${channelAssignments.weeklyForecastChannel}`
+      );
+      return weeklyChannel.webhookUrl;
+    }
+  }
+
+  return null;
 }
 
 // Function to validate specific environment variables
@@ -149,7 +241,12 @@ const validateConfig = (requiredVars = [], optionalVars = []) => {
 };
 
 // Function to get all configured regions
-const getConfiguredRegions = () => {
+const getConfiguredRegions = async () => {
+  // Ensure config is loaded and merged
+  if (!mergedConfig) {
+    mergedConfig = await mergeConfigurations();
+  }
+
   if (!mergedConfig.regions) return [];
 
   return Object.entries(mergedConfig.regions)
@@ -164,7 +261,12 @@ const getConfiguredRegions = () => {
 };
 
 // Function to get a specific region configuration
-const getRegionConfig = (regionId) => {
+const getRegionConfig = async (regionId) => {
+  // Ensure config is loaded and merged
+  if (!mergedConfig) {
+    mergedConfig = await mergeConfigurations();
+  }
+
   if (!mergedConfig.regions || !mergedConfig.regions[regionId]) {
     throw new Error(`Region '${regionId}' not found in configuration`);
   }
@@ -192,13 +294,13 @@ const getRegionConfig = (regionId) => {
 };
 
 // Function to get the consolidated weekly forecast webhook URL
-const getWeeklyForecastWebhookUrl = () => {
-  return config.WEEKLY_FORECAST_WEBHOOK_URL;
+const getWeeklyForecastWebhookUrl = async () => {
+  return await getWeeklyForecastWebhookUrlInternal();
 };
 
 // Function to validate region webhook configuration
-const validateRegionConfig = (regionId) => {
-  const region = getRegionConfig(regionId);
+const validateRegionConfig = async (regionId) => {
+  const region = await getRegionConfig(regionId);
 
   if (!region.webhookUrls || region.webhookUrls.length === 0) {
     throw new Error(`No webhook URLs configured for region '${regionId}'`);

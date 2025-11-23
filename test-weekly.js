@@ -36,7 +36,7 @@ async function mockSendDiscordMessage(webhookUrl, content) {
 async function testConsolidatedWeeklyForecastWebhook() {
   try {
     // Get weekly forecast webhook URL
-    const weeklyForecastUrl = getWeeklyForecastWebhookUrl();
+    const weeklyForecastUrl = await getWeeklyForecastWebhookUrl();
 
     // If no weekly forecast URL configured, use a mock URL for testing
     const mockWeeklyUrl =
@@ -50,7 +50,7 @@ async function testConsolidatedWeeklyForecastWebhook() {
     }
 
     // Get configured regions from the merged config system
-    const configuredRegions = getConfiguredRegions();
+    const configuredRegions = await getConfiguredRegions();
 
     if (configuredRegions.length === 0) {
       logger.warn("No regions configured with webhook URLs");
@@ -68,7 +68,7 @@ async function testConsolidatedWeeklyForecastWebhook() {
 
     for (const region of configuredRegions) {
       try {
-        const regionConfig = getRegionConfig(region.id);
+        const regionConfig = await getRegionConfig(region.id);
 
         const weeklyForecast = getRegionalWeeklyForecast(regionConfig);
 
