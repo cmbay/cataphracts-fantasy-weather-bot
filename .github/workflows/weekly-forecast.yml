@@ -24,6 +24,10 @@ jobs:
 
       - name: Send weekly weather forecast
         env:
+          # Google Sheets configuration
+          GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}
+          GOOGLE_SPREADSHEET_ID: ${{ secrets.GOOGLE_SPREADSHEET_ID }}
+
           # Channel webhook URLs mapped to channel IDs
           CHANNELS_CONFIG: ${{ secrets.CHANNELS_CONFIG }}
 
