@@ -13,7 +13,7 @@ const { logger } = require("./src/utils/logger");
 async function sendAllRegionalWeeklyForecasts() {
   try {
     // Check if consolidated weekly forecast webhook is configured
-    const weeklyForecastUrl = getWeeklyForecastWebhookUrl();
+    const weeklyForecastUrl = await getWeeklyForecastWebhookUrl();
 
     if (!weeklyForecastUrl) {
       logger.error(
@@ -102,7 +102,7 @@ async function sendDiscordMessage(webhookUrl, content) {
 
 async function sendConsolidatedWeeklyForecastWebhook() {
   try {
-    const weeklyForecastUrl = getWeeklyForecastWebhookUrl();
+    const weeklyForecastUrl = await getWeeklyForecastWebhookUrl();
 
     if (!weeklyForecastUrl) {
       logger.error(
@@ -114,7 +114,7 @@ async function sendConsolidatedWeeklyForecastWebhook() {
       process.exit(1);
     }
 
-    const configuredRegions = getConfiguredRegions();
+    const configuredRegions = await getConfiguredRegions();
 
     if (configuredRegions.length === 0) {
       logger.warn("No regions configured with webhook URLs");
@@ -132,7 +132,7 @@ async function sendConsolidatedWeeklyForecastWebhook() {
 
     for (const region of configuredRegions) {
       try {
-        const regionConfig = getRegionConfig(region.id);
+        const regionConfig = await getRegionConfig(region.id);
         const weeklyForecast = getRegionalWeeklyForecast(regionConfig);
 
         if (regionConfig.name) {
