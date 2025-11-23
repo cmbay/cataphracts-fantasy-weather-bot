@@ -12,7 +12,7 @@ const { logger } = require("./src/utils/logger");
 async function sendRegionalWeatherWebhook(regionId) {
   try {
     // Get region configuration
-    const regionConfig = getRegionConfig(regionId);
+    const regionConfig = await getRegionConfig(regionId);
     logger.info(`Sending weather update for region: ${regionConfig.name}`);
 
     // Get weather data for this region (single condition + impacts)
@@ -117,7 +117,7 @@ async function sendRegionalWeatherWebhook(regionId) {
 
 async function sendAllRegionalWebhooks() {
   try {
-    const configuredRegions = getConfiguredRegions();
+    const configuredRegions = await getConfiguredRegions();
 
     if (configuredRegions.length === 0) {
       logger.warn("No regions configured with webhook URLs");

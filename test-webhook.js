@@ -26,7 +26,7 @@ async function mockSendWebhook(regionConfig, messageContent, webhookIndex) {
 async function testRegionalWeatherWebhook(regionId) {
   try {
     // Get region configuration from the merged config system
-    const regionConfig = getRegionConfig(regionId);
+    const regionConfig = await getRegionConfig(regionId);
 
     logger.info(`Testing weather update for region: ${regionConfig.name}`);
 
@@ -87,7 +87,7 @@ async function testRegionalWeatherWebhook(regionId) {
 async function testAllRegionalWebhooks() {
   try {
     // Get configured regions from the merged config system
-    const configuredRegions = getConfiguredRegions();
+    const configuredRegions = await getConfiguredRegions();
 
     if (configuredRegions.length === 0) {
       logger.warn("No regions configured with webhook URLs");

@@ -13,11 +13,13 @@
     "validate-regions": "node create-region.js validate",
     "region-help": "node create-region.js help",
     "create-demo-regions": "node create-demo-regions.js",
-    "generate-secret": "node generate-github-secret.js"
+    "generate-secret": "node generate-github-secret.js",
+    "test-sheets": "node test-google-sheets.js"
   },
   "dependencies": {
     "axios": "^1.6.0",
-    "dotenv": "^16.0.0"
+    "dotenv": "^16.0.0",
+    "googleapis": "^166.0.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.0"
