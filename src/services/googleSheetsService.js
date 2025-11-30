@@ -53,27 +53,31 @@ async function fetchChannelsConfig(spreadsheetId, base64Key) {
     const sheets = await initializeClient(base64Key);
     const channels = {};
 
-    // Fetch Commanders List data (Column K: Channel Friendly Name, Column M: Weather Webhook)
-    // Starting from row 3
+    // Fetch Commanders List data
     logger.info("Fetching Commanders List data from Google Sheets");
     const commandersResponse = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: "Commander Database!K3:M", // K and M columns from row 3 onwards
+      range: "Commander Database",
     });
 
     const commandersRows = commandersResponse.data.values || [];
     logger.info(
-      `Retrieved ${commandersRows.length} rows from Commander Database`
+      `Retrieved ${Math.max(0, commandersRows.length - 1)} rows from Commander Database`
     );
-    // Process Commanders List data
-    // Column K is index 0 (Friendly Name), Column M is index 2 (Webhook URL)
-    commandersRows.forEach((row, index) => {
-      // Strip surrounding quotes from friendly name if present
-      const friendlyName = row[0]?.trim().replace(/^["']+|["']+$/g, "");
-      const webhookUrl = row[2]?.trim();
+
+    // Extract header row
+    const commanderHeader = commandersRows[0] || [];
+    const commanderData = commandersRows.slice(2 - 1); // still start at row 3
+
+    // Find header indices
+    const cmdNameIdx = commanderHeader.indexOf("Channel Friendly Name");
+    const cmdWebhookIdx = commanderHeader.indexOf("Weather Webhook");
+
+    commanderData.forEach((row, index) => {
+      const friendlyName = row[cmdNameIdx]?.trim().replace(/^["']+|["']+$/g, "");
+      const webhookUrl = row[cmdWebhookIdx]?.trim();
 
       if (friendlyName && webhookUrl) {
-        // Create channel ID from friendly name (lowercase, replace spaces with hyphens)
         const channelId = friendlyName.toLowerCase().replace(/\s+/g, "-");
         channels[channelId] = {
           name: friendlyName,
@@ -82,33 +86,33 @@ async function fetchChannelsConfig(spreadsheetId, base64Key) {
         logger.info(`Added channel from Commander Database: ${channelId}`);
       } else {
         logger.warn(
-          `Skipping Commander Database row ${
-            index + 3
-          }: missing name or webhook URL`
+          `Skipping Commander Database row ${index + 3}: missing name or webhook URL`
         );
       }
     });
 
-    // Fetch Diplomat Database data (Column F: Friendly Name, Column G: Webhook URL)
-    // Starting from row 2
+    // Fetch Diplomat Database data (using column names)
     logger.info("Fetching Diplomat Database data from Google Sheets");
     const diplomatResponse = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: "Diplomat Database!F2:G", // F and G columns from row 2 onwards
+      range: "Diplomat Database",
     });
 
     const diplomatRows = diplomatResponse.data.values || [];
-    logger.info(`Retrieved ${diplomatRows.length} rows from Diplomat Database`);
+    logger.info(`Retrieved ${Math.max(0, diplomatRows.length - 1)} rows from Diplomat Database`);
 
-    // Process Diplomat Database data
-    // Column F is index 0 (Friendly Name), Column G is index 1 (Webhook URL)
-    diplomatRows.forEach((row, index) => {
-      // Strip surrounding quotes from friendly name if present
-      const friendlyName = row[0]?.trim().replace(/^["']+|["']+$/g, "");
-      const webhookUrl = row[1]?.trim();
+    const dipHeader = diplomatRows[0] || [];
+    const diplomatData = diplomatRows.slice(1); // still start from row 2
+
+    // Diplomat uses the SAME headers:
+    const dipNameIdx = dipHeader.indexOf("Channel Friendly Name");
+    const dipWebhookIdx = dipHeader.indexOf("Weather Webhook");
+
+    diplomatData.forEach((row, index) => {
+      const friendlyName = row[dipNameIdx]?.trim().replace(/^["']+|["']+$/g, "");
+      const webhookUrl = row[dipWebhookIdx]?.trim();
 
       if (friendlyName && webhookUrl) {
-        // Create channel ID from friendly name
         const channelId = friendlyName.toLowerCase().replace(/\s+/g, "-");
         channels[channelId] = {
           name: friendlyName,
@@ -117,9 +121,7 @@ async function fetchChannelsConfig(spreadsheetId, base64Key) {
         logger.info(`Added channel from Diplomat Database: ${channelId}`);
       } else {
         logger.warn(
-          `Skipping Diplomat Database row ${
-            index + 2
-          }: missing name or webhook URL`
+          `Skipping Diplomat Database row ${index + 2}: missing name or webhook URL`
         );
       }
     });
