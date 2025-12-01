@@ -7,6 +7,7 @@ const {
   getConfiguredRegions,
   getRegionConfig,
 } = require("./src/config/config");
+const { updateWeatherTable } = require("./src/services/googleSheetsService");
 const { logger } = require("./src/utils/logger");
 
 async function sendRegionalWeatherWebhook(regionId) {
@@ -115,6 +116,39 @@ async function sendRegionalWeatherWebhook(regionId) {
   }
 }
 
+/**
+ * Update weather data in Google Sheets Master Lists table
+ * @param {object} weatherByRegionId - Object mapping region_id to current weather condition
+ */
+async function updateGoogleSheetsWeather(weatherByRegionId) {
+  const spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID;
+  const serviceAccountKey = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
+
+  if (!spreadsheetId || !serviceAccountKey) {
+    logger.info("Google Sheets not configured, skipping weather table update");
+    return;
+  }
+
+  try {
+    logger.info("Updating weather table in Google Sheets");
+    const result = await updateWeatherTable(
+      spreadsheetId,
+      serviceAccountKey,
+      weatherByRegionId
+    );
+    logger.info(`Updated ${result.updated} weather entries in Google Sheets`);
+    console.log(
+      `📊 Updated ${result.updated} weather entries in Google Sheets`
+    );
+  } catch (error) {
+    // Log error but don't fail the whole process
+    logger.error(
+      `Failed to update Google Sheets weather table: ${error.message}`
+    );
+    console.warn(`⚠️ Failed to update Google Sheets: ${error.message}`);
+  }
+}
+
 async function sendAllRegionalWebhooks() {
   try {
     const configuredRegions = await getConfiguredRegions();
@@ -130,8 +164,17 @@ async function sendAllRegionalWebhooks() {
     );
 
     const results = [];
+    const weatherByRegionId = {}; // Collect weather for Google Sheets update
+
     for (const region of configuredRegions) {
       try {
+        // Get weather data for this region
+        const regionConfig = await getRegionConfig(region.id);
+        const weather = getRegionalWeatherUpdate(regionConfig);
+
+        // Store for Google Sheets update
+        weatherByRegionId[region.id] = weather.condition;
+
         await sendRegionalWeatherWebhook(region.id);
         results.push({ regionId: region.id, success: true });
       } catch (error) {
@@ -142,6 +185,9 @@ async function sendAllRegionalWebhooks() {
         });
       }
     }
+
+    // Update Google Sheets with all weather data
+    await updateGoogleSheetsWeather(weatherByRegionId);
 
     // Log summary
     const successful = results.filter((r) => r.success).length;
