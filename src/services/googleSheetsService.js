@@ -27,7 +27,7 @@ async function initializeClient(base64Key) {
     // Create authentication client
     const auth = new google.auth.GoogleAuth({
       credentials,
-      scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
+      scopes: ["https://www.googleapis.com/auth/spreadsheets"],
     });
 
     // Create sheets client
@@ -62,19 +62,27 @@ async function fetchChannelsConfig(spreadsheetId, base64Key) {
 
     const commandersRows = commandersResponse.data.values || [];
     logger.info(
-      `Retrieved ${Math.max(0, commandersRows.length - 1)} rows from Commander Database`
+      `Retrieved ${Math.max(
+        0,
+        commandersRows.length - 1
+      )} rows from Commander Database`
     );
 
     // Extract header row
     const commanderHeader = commandersRows[0] || [];
     const commanderData = commandersRows.slice(2 - 1); // still start at row 3
 
-    // Find header indices
-    const cmdNameIdx = commanderHeader.indexOf("Channel Friendly Name");
-    const cmdWebhookIdx = commanderHeader.indexOf("Weather Webhook");
+    // Find header indices using helper function
+    const cmdNameIdx = findColumnIndex(
+      commanderHeader,
+      "Channel Friendly Name"
+    );
+    const cmdWebhookIdx = findColumnIndex(commanderHeader, "Weather Webhook");
 
     commanderData.forEach((row, index) => {
-      const friendlyName = row[cmdNameIdx]?.trim().replace(/^["']+|["']+$/g, "");
+      const friendlyName = row[cmdNameIdx]
+        ?.trim()
+        .replace(/^["']+|["']+$/g, "");
       const webhookUrl = row[cmdWebhookIdx]?.trim();
 
       if (friendlyName && webhookUrl) {
@@ -86,7 +94,9 @@ async function fetchChannelsConfig(spreadsheetId, base64Key) {
         logger.info(`Added channel from Commander Database: ${channelId}`);
       } else {
         logger.warn(
-          `Skipping Commander Database row ${index + 3}: missing name or webhook URL`
+          `Skipping Commander Database row ${
+            index + 3
+          }: missing name or webhook URL`
         );
       }
     });
@@ -99,17 +109,24 @@ async function fetchChannelsConfig(spreadsheetId, base64Key) {
     });
 
     const diplomatRows = diplomatResponse.data.values || [];
-    logger.info(`Retrieved ${Math.max(0, diplomatRows.length - 1)} rows from Diplomat Database`);
+    logger.info(
+      `Retrieved ${Math.max(
+        0,
+        diplomatRows.length - 1
+      )} rows from Diplomat Database`
+    );
 
     const dipHeader = diplomatRows[0] || [];
     const diplomatData = diplomatRows.slice(1); // still start from row 2
 
-    // Diplomat uses the SAME headers:
-    const dipNameIdx = dipHeader.indexOf("Channel Friendly Name");
-    const dipWebhookIdx = dipHeader.indexOf("Weather Webhook");
+    // Diplomat uses the SAME headers - find using helper function
+    const dipNameIdx = findColumnIndex(dipHeader, "Channel Friendly Name");
+    const dipWebhookIdx = findColumnIndex(dipHeader, "Weather Webhook");
 
     diplomatData.forEach((row, index) => {
-      const friendlyName = row[dipNameIdx]?.trim().replace(/^["']+|["']+$/g, "");
+      const friendlyName = row[dipNameIdx]
+        ?.trim()
+        .replace(/^["']+|["']+$/g, "");
       const webhookUrl = row[dipWebhookIdx]?.trim();
 
       if (friendlyName && webhookUrl) {
@@ -121,7 +138,9 @@ async function fetchChannelsConfig(spreadsheetId, base64Key) {
         logger.info(`Added channel from Diplomat Database: ${channelId}`);
       } else {
         logger.warn(
-          `Skipping Diplomat Database row ${index + 2}: missing name or webhook URL`
+          `Skipping Diplomat Database row ${
+            index + 2
+          }: missing name or webhook URL`
         );
       }
     });
@@ -219,9 +238,177 @@ async function fetchAllConfig(spreadsheetId, base64Key) {
   }
 }
 
+/**
+ * Update weather data in the Master Lists sheet
+ * Finds the weather table by looking for headers (region_id, name, Current Weather)
+ * and updates the Current Weather column for each region
+ * @param {string} spreadsheetId - The Google Spreadsheet ID
+ * @param {string} base64Key - Base64-encoded service account key
+ * @param {object} weatherByRegionId - Object mapping region_id to current weather condition
+ * @returns {object} Result with updated count
+ */
+async function updateWeatherTable(spreadsheetId, base64Key, weatherByRegionId) {
+  try {
+    const sheets = await initializeClient(base64Key);
+
+    // Read a targeted range where the weather table is expected (rows 15-50)
+    // This is much more efficient than reading the entire sheet
+    logger.info(
+      "Reading Master Lists sheet to find weather table (rows 15-50)"
+    );
+    const headerSearchResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: "Master Lists!A15:Z50",
+    });
+
+    const headerRows = headerSearchResponse.data.values || [];
+    if (headerRows.length === 0) {
+      throw new Error("No data found in Master Lists rows 15-50");
+    }
+
+    // Find the header row with region_id and Current Weather
+    let headerRowIndex = -1;
+    let regionIdColIndex = -1;
+    let weatherColIndex = -1;
+    const startRow = 15; // Offset since we started reading from row 15
+
+    for (let rowIdx = 0; rowIdx < headerRows.length; rowIdx++) {
+      const row = headerRows[rowIdx];
+      regionIdColIndex = findColumnIndex(row, "region_id");
+
+      if (regionIdColIndex !== -1) {
+        // Found region_id header, now look for Current Weather in same row
+        weatherColIndex = findColumnIndex(row, "current weather");
+
+        if (weatherColIndex !== -1) {
+          headerRowIndex = rowIdx + startRow - 1; // Adjust to 0-based sheet index
+          logger.info(
+            `Found weather table headers at row ${headerRowIndex + 1}, ` +
+              `region_id col ${regionIdColIndex + 1}, weather col ${
+                weatherColIndex + 1
+              }`
+          );
+          break;
+        }
+      }
+    }
+
+    if (
+      headerRowIndex === -1 ||
+      regionIdColIndex === -1 ||
+      weatherColIndex === -1
+    ) {
+      throw new Error(
+        "Could not find weather table headers (region_id, Current Weather) in Master Lists rows 15-50"
+      );
+    }
+
+    // Now read the data rows starting from the header row
+    const dataResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `Master Lists!A${headerRowIndex + 2}:Z`, // Start from row after header
+    });
+
+    const dataRows = dataResponse.data.values || [];
+
+    // Build batch update data - collect all weather updates
+    const updates = [];
+    let updatedCount = 0;
+
+    // Iterate through data rows
+    for (let rowIdx = 0; rowIdx < dataRows.length; rowIdx++) {
+      const row = dataRows[rowIdx];
+      const actualSheetRow = headerRowIndex + 2 + rowIdx; // Actual row number in sheet (1-based)
+      const regionId = (row[regionIdColIndex] || "").toString().trim();
+
+      // Stop if we hit an empty region_id (end of table)
+      if (!regionId) {
+        break;
+      }
+
+      // Only update if we have weather data for this region
+      if (weatherByRegionId[regionId]) {
+        const weather = weatherByRegionId[regionId];
+        // Convert to A1 notation - column letter(s) and row number (1-indexed)
+        const colLetter = columnToLetter(weatherColIndex);
+        const cellRange = `Master Lists!${colLetter}${actualSheetRow}`;
+
+        updates.push({
+          range: cellRange,
+          values: [[weather]],
+        });
+        updatedCount++;
+        logger.info(`Queued weather update for region ${regionId}: ${weather}`);
+      }
+    }
+
+    if (updates.length === 0) {
+      logger.warn("No weather updates to apply");
+      return { updated: 0 };
+    }
+
+    // Perform batch update
+    logger.info(`Applying batch update for ${updates.length} weather cells`);
+    await sheets.spreadsheets.values.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        valueInputOption: "RAW",
+        data: updates,
+      },
+    });
+
+    logger.info(
+      `Successfully updated ${updatedCount} weather entries in Master Lists`
+    );
+    return { updated: updatedCount };
+  } catch (error) {
+    logger.error(`Failed to update weather table: ${error.message}`);
+    throw new Error(
+      `Failed to update weather table in Google Sheets: ${error.message}`
+    );
+  }
+}
+
+/**
+ * Find column index by header name in a row (case-insensitive)
+ * @param {Array} headerRow - Array of header cell values
+ * @param {string} headerName - Header name to find
+ * @returns {number} Column index or -1 if not found
+ */
+function findColumnIndex(headerRow, headerName) {
+  const normalizedName = headerName.toLowerCase().trim();
+  for (let i = 0; i < headerRow.length; i++) {
+    const cell = (headerRow[i] || "").toString().trim().toLowerCase();
+    if (cell === normalizedName) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+/**
+ * Convert a 0-indexed column number to A1 notation letter(s)
+ * @param {number} colIndex - 0-indexed column number
+ * @returns {string} Column letter(s) (A, B, ..., Z, AA, AB, ...)
+ */
+function columnToLetter(colIndex) {
+  let letter = "";
+  let temp = colIndex;
+
+  while (temp >= 0) {
+    letter = String.fromCharCode((temp % 26) + 65) + letter;
+    temp = Math.floor(temp / 26) - 1;
+  }
+
+  return letter;
+}
+
 module.exports = {
   initializeClient,
   fetchChannelsConfig,
   fetchChannelAssignmentsConfig,
   fetchAllConfig,
+  updateWeatherTable,
+  findColumnIndex,
+  columnToLetter,
 };
