@@ -244,10 +244,10 @@ async function fetchAllConfig(spreadsheetId, base64Key) {
  * and updates the Current Weather column for each region
  * @param {string} spreadsheetId - The Google Spreadsheet ID
  * @param {string} base64Key - Base64-encoded service account key
- * @param {object} weatherByRegionId - Object mapping region_id to current weather condition
+ * @param {object} weatherByRegionName - Object mapping region name to current weather condition
  * @returns {object} Result with updated count
  */
-async function updateWeatherTable(spreadsheetId, base64Key, weatherByRegionId) {
+async function updateWeatherTable(spreadsheetId, base64Key, weatherByRegionName) {
   try {
     const sheets = await initializeClient(base64Key);
 
@@ -266,25 +266,25 @@ async function updateWeatherTable(spreadsheetId, base64Key, weatherByRegionId) {
       throw new Error("No data found in Master Lists rows 15-50");
     }
 
-    // Find the header row with region_id and Current Weather
+    // Find the header row with name and Current Weather columns
     let headerRowIndex = -1;
-    let regionIdColIndex = -1;
+    let nameColIndex = -1;
     let weatherColIndex = -1;
     const startRow = 15; // Offset since we started reading from row 15
 
     for (let rowIdx = 0; rowIdx < headerRows.length; rowIdx++) {
       const row = headerRows[rowIdx];
-      regionIdColIndex = findColumnIndex(row, "region_id");
+      nameColIndex = findColumnIndex(row, "name");
 
-      if (regionIdColIndex !== -1) {
-        // Found region_id header, now look for Current Weather in same row
+      if (nameColIndex !== -1) {
+        // Found name header, now look for Current Weather in same row
         weatherColIndex = findColumnIndex(row, "current weather");
 
         if (weatherColIndex !== -1) {
           headerRowIndex = rowIdx + startRow - 1; // Adjust to 0-based sheet index
           logger.info(
             `Found weather table headers at row ${headerRowIndex + 1}, ` +
-              `region_id col ${regionIdColIndex + 1}, weather col ${
+              `name col ${nameColIndex + 1}, weather col ${
                 weatherColIndex + 1
               }`
           );
@@ -295,11 +295,11 @@ async function updateWeatherTable(spreadsheetId, base64Key, weatherByRegionId) {
 
     if (
       headerRowIndex === -1 ||
-      regionIdColIndex === -1 ||
+      nameColIndex === -1 ||
       weatherColIndex === -1
     ) {
       throw new Error(
-        "Could not find weather table headers (region_id, Current Weather) in Master Lists rows 15-50"
+        "Could not find weather table headers (name, Current Weather) in Master Lists rows 15-50"
       );
     }
 
@@ -319,16 +319,20 @@ async function updateWeatherTable(spreadsheetId, base64Key, weatherByRegionId) {
     for (let rowIdx = 0; rowIdx < dataRows.length; rowIdx++) {
       const row = dataRows[rowIdx];
       const actualSheetRow = headerRowIndex + 2 + rowIdx; // Actual row number in sheet (1-based)
-      const regionId = (row[regionIdColIndex] || "").toString().trim();
+      // Get region name and remove surrounding quotes if present
+      const regionName = (row[nameColIndex] || "")
+        .toString()
+        .trim()
+        .replace(/^["']+|["']+$/g, "");
 
-      // Stop if we hit an empty region_id (end of table)
-      if (!regionId) {
+      // Stop if we hit an empty name (end of table)
+      if (!regionName) {
         break;
       }
 
       // Only update if we have weather data for this region
-      if (weatherByRegionId[regionId]) {
-        const weather = weatherByRegionId[regionId];
+      if (weatherByRegionName[regionName]) {
+        const weather = weatherByRegionName[regionName];
         // Convert to A1 notation - column letter(s) and row number (1-indexed)
         const colLetter = columnToLetter(weatherColIndex);
         const cellRange = `Master Lists!${colLetter}${actualSheetRow}`;
@@ -338,7 +342,7 @@ async function updateWeatherTable(spreadsheetId, base64Key, weatherByRegionId) {
           values: [[weather]],
         });
         updatedCount++;
-        logger.info(`Queued weather update for region ${regionId}: ${weather}`);
+        logger.info(`Queued weather update for region "${regionName}": ${weather}`);
       }
     }
 

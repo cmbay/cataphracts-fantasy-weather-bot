@@ -118,9 +118,9 @@ async function sendRegionalWeatherWebhook(regionId) {
 
 /**
  * Update weather data in Google Sheets Master Lists table
- * @param {object} weatherByRegionId - Object mapping region_id to current weather condition
+ * @param {object} weatherByRegionName - Object mapping region name to current weather condition
  */
-async function updateGoogleSheetsWeather(weatherByRegionId) {
+async function updateGoogleSheetsWeather(weatherByRegionName) {
   const spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID;
   const serviceAccountKey = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
 
@@ -134,7 +134,7 @@ async function updateGoogleSheetsWeather(weatherByRegionId) {
     const result = await updateWeatherTable(
       spreadsheetId,
       serviceAccountKey,
-      weatherByRegionId
+      weatherByRegionName
     );
     logger.info(`Updated ${result.updated} weather entries in Google Sheets`);
     console.log(
@@ -164,7 +164,7 @@ async function sendAllRegionalWebhooks() {
     );
 
     const results = [];
-    const weatherByRegionId = {}; // Collect weather for Google Sheets update
+    const weatherByRegionName = {}; // Collect weather for Google Sheets update, keyed by region name
 
     for (const region of configuredRegions) {
       try {
@@ -172,8 +172,8 @@ async function sendAllRegionalWebhooks() {
         const regionConfig = await getRegionConfig(region.id);
         const weather = getRegionalWeatherUpdate(regionConfig);
 
-        // Store for Google Sheets update
-        weatherByRegionId[region.id] = weather.condition;
+        // Store for Google Sheets update, using region name as key
+        weatherByRegionName[regionConfig.name] = weather.condition;
 
         await sendRegionalWeatherWebhook(region.id);
         results.push({ regionId: region.id, success: true });
@@ -187,7 +187,7 @@ async function sendAllRegionalWebhooks() {
     }
 
     // Update Google Sheets with all weather data
-    await updateGoogleSheetsWeather(weatherByRegionId);
+    await updateGoogleSheetsWeather(weatherByRegionName);
 
     // Log summary
     const successful = results.filter((r) => r.success).length;
