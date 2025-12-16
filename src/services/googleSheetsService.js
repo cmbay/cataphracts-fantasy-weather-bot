@@ -184,8 +184,10 @@ async function fetchChannelAssignmentsConfig(spreadsheetId, base64Key) {
     // Try to parse as a single JSON block (join all cells)
     let assignmentsData;
     try {
-      // Join all cells into a single string and try to parse as JSON
-      const jsonString = rows.map((row) => row.join("")).join("");
+      // For merged cells, the value is only in the first cell of the merge
+      // Get the first non-empty value from the range
+      const jsonString = rows.flatMap((row) => row.filter((cell) => cell && cell.trim())).join("");
+      logger.info(`Attempting to parse JSON string (length: ${jsonString.length})`);
       assignmentsData = JSON.parse(jsonString);
       logger.info("Successfully parsed channel assignments as JSON");
     } catch (parseError) {
@@ -193,6 +195,8 @@ async function fetchChannelAssignmentsConfig(spreadsheetId, base64Key) {
       logger.warn(
         "Failed to parse as single JSON, attempting table interpretation"
       );
+      logger.error(`JSON parse error: ${parseError.message}`);
+      logger.error(`First 500 chars of string: ${rows.flatMap((row) => row.filter((cell) => cell && cell.trim())).join("").substring(0, 500)}`);
 
       // Alternative: assume first row is headers, rest are data
       // This is a fallback and may need adjustment based on actual sheet structure
