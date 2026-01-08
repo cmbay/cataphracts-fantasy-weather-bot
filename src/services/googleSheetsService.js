@@ -315,6 +315,10 @@ async function updateWeatherTable(spreadsheetId, base64Key, weatherByRegionName)
 
     const dataRows = dataResponse.data.values || [];
 
+    // Debug: log the region names we're looking for
+    const lookupKeys = Object.keys(weatherByRegionName);
+    logger.info(`Looking for regions: ${JSON.stringify(lookupKeys)}`);
+
     // Build batch update data - collect all weather updates
     const updates = [];
     let updatedCount = 0;
@@ -334,9 +338,29 @@ async function updateWeatherTable(spreadsheetId, base64Key, weatherByRegionName)
         break;
       }
 
+      // Debug: log each region name found in sheet
+      logger.info(`Found region in sheet row ${actualSheetRow}: "${regionName}"`);
+
+      // Try to find a matching weather entry
+      // First try exact match, then try suffix match (sheet name might be suffix of config name)
+      let weather = weatherByRegionName[regionName];
+      
+      if (!weather) {
+        // Try to find a config key that ends with the sheet region name
+        // e.g., "Maraga Northern Region" ends with "Northern Region"
+        const normalizedSheetName = regionName.toLowerCase().trim();
+        for (const configKey of lookupKeys) {
+          const normalizedConfigKey = configKey.toLowerCase().trim();
+          if (normalizedConfigKey.endsWith(normalizedSheetName)) {
+            weather = weatherByRegionName[configKey];
+            logger.info(`Matched sheet "${regionName}" to config "${configKey}"`);
+            break;
+          }
+        }
+      }
+
       // Only update if we have weather data for this region
-      if (weatherByRegionName[regionName]) {
-        const weather = weatherByRegionName[regionName];
+      if (weather) {
         // Convert to A1 notation - column letter(s) and row number (1-indexed)
         const colLetter = columnToLetter(weatherColIndex);
         const cellRange = `Master Lists!${colLetter}${actualSheetRow}`;
