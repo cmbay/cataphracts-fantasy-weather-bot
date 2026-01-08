@@ -158,7 +158,7 @@ async function fetchChannelsConfig(spreadsheetId, base64Key) {
 }
 
 /**
- * Fetch channel assignments configuration from Checklists sheet
+ * Fetch channel assignments configuration from WeatherLocations sheet
  * @param {string} spreadsheetId - The Google Spreadsheet ID
  * @param {string} base64Key - Base64-encoded service account key
  * @returns {object} Channel assignments configuration object
@@ -167,15 +167,15 @@ async function fetchChannelAssignmentsConfig(spreadsheetId, base64Key) {
   try {
     const sheets = await initializeClient(base64Key);
 
-    // Fetch data from Checklists sheet, cell range I12:L39
-    logger.info("Fetching channel assignments from Checklists sheet (I12:L39)");
+    // Fetch data from WeatherLocations sheet, cell range A2:D29
+    logger.info("Fetching channel assignments from WeatherLocations sheet (A2:D29)");
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: "Checklists!I12:L39",
+      range: "WeatherLocations!A2:D29",
     });
 
     const rows = response.data.values || [];
-    logger.info(`Retrieved ${rows.length} rows from Checklists sheet`);
+    logger.info(`Retrieved ${rows.length} rows from WeatherLocations sheet`);
 
     // The cell range contains JSON-like data that represents channel assignments
     // We need to parse this data into the expected format
@@ -201,7 +201,7 @@ async function fetchChannelAssignmentsConfig(spreadsheetId, base64Key) {
       // Alternative: assume first row is headers, rest are data
       // This is a fallback and may need adjustment based on actual sheet structure
       throw new Error(
-        `Unable to parse channel assignments from Checklists!I12:L39. ` +
+        `Unable to parse channel assignments from WeatherLocations!A2:D29. ` +
           `Expected JSON data in range. Error: ${parseError.message}`
       );
     }
