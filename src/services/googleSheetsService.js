@@ -346,14 +346,38 @@ async function updateWeatherTable(spreadsheetId, base64Key, weatherByRegionName)
       let weather = weatherByRegionName[regionName];
       
       if (!weather) {
-        // Try to find a config key that ends with the sheet region name
-        // e.g., "Maraga Northern Region" ends with "Northern Region"
+        // Try to find a config key that matches the sheet region name
+        // Strategies:
+        // 1. Config key ends with sheet name (e.g., "Maraga Northern Region" ends with "Northern Region")
+        // 2. Sheet name ends with config key's suffix (e.g., "Frostborough Region" ends with "Frostborough")
+        // 3. Config key contains the main distinctive word from sheet name
         const normalizedSheetName = regionName.toLowerCase().trim();
+        
         for (const configKey of lookupKeys) {
           const normalizedConfigKey = configKey.toLowerCase().trim();
+          
+          // Strategy 1: config key ends with sheet name
           if (normalizedConfigKey.endsWith(normalizedSheetName)) {
             weather = weatherByRegionName[configKey];
-            logger.info(`Matched sheet "${regionName}" to config "${configKey}"`);
+            logger.info(`Matched sheet "${regionName}" to config "${configKey}" (config ends with sheet)`);
+            break;
+          }
+          
+          // Strategy 2: sheet name starts with the last word(s) of config key
+          // e.g., config "Patlania Frostborough" -> check if sheet "Frostborough Region" starts with "Frostborough"
+          const configWords = normalizedConfigKey.split(/\s+/);
+          const lastConfigWord = configWords[configWords.length - 1];
+          if (lastConfigWord.length > 3 && normalizedSheetName.startsWith(lastConfigWord)) {
+            weather = weatherByRegionName[configKey];
+            logger.info(`Matched sheet "${regionName}" to config "${configKey}" (sheet starts with "${lastConfigWord}")`);
+            break;
+          }
+          
+          // Strategy 3: config key contains sheet name (without generic words like "Region")
+          const sheetWithoutGeneric = normalizedSheetName.replace(/\s*(region|island|point|peninsula)s?\s*/gi, ' ').trim();
+          if (sheetWithoutGeneric.length > 3 && normalizedConfigKey.includes(sheetWithoutGeneric)) {
+            weather = weatherByRegionName[configKey];
+            logger.info(`Matched sheet "${regionName}" to config "${configKey}" (config contains "${sheetWithoutGeneric}")`);
             break;
           }
         }
