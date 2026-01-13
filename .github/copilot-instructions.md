@@ -15,51 +15,73 @@ Webhook service that posts daily weather updates for fictional campaigns to Disc
 
 - **Main Entry**: [`webhook.js`](../webhook.js) - daily weather webhook execution
 - **Weekly Entry**: [`weekly-webhook.js`](../weekly-webhook.js) - weekly forecast webhook execution
-- **Config**: [`src/config/config.js`](../src/config/config.js) - environment variables
+- **Config**: [`src/config/config.js`](../src/config/config.js) - configuration loading
 - **Weather Service**: [`src/services/weatherService.js`](../src/services/weatherService.js) - weather generation logic
+- **Google Sheets Service**: [`src/services/googleSheetsService.js`](../src/services/googleSheetsService.js) - webhook URL fetching
 - **Logger**: [`src/utils/logger.js`](../src/utils/logger.js) - structured logging
+
+## Data Sources
+
+**Google Sheets (Required):**
+
+- `Commander Database` sheet - Weather webhooks for commander channels
+- `Diplomat Database` sheet - Weather webhooks for diplomat channels, weekly forecast webhook (Is Leader = TRUE)
+
+**Local Config:**
+
+- `regions.json` - Weather probabilities per region (seasonal conditions with weights)
 
 ## Environment Variables
 
-**Configuration:**
+**Required:**
 
-- `REGIONS_CONFIG`: Complete regions.json as JSON string (GitHub Actions only)
-- `WEEKLY_FORECAST_WEBHOOK_URL`: Consolidated weekly forecasts (optional)
+- `GOOGLE_SERVICE_ACCOUNT_KEY`: Base64-encoded service account JSON
+- `GOOGLE_SPREADSHEET_ID`: Google Spreadsheet ID containing Commander/Diplomat databases
 
 **Local Development:**
 
-- Create `regions.json` in project root with webhook URLs
-- File paths checked in order: `regions.json`, `config/regions.json`, `src/config/custom-regions.json`, `src/config/regions.json`, `src/config/regions-example.json`
+- Create `.env` file with the above variables
+- `regions.json` defines weather probabilities (checked in order: project root, config/, src/config/)
 
-**Security:** `regions.json` contains sensitive webhook URLs and must not be committed. Use `REGIONS_CONFIG` environment variable for GitHub Actions.
+## Weather System
 
-## Common Tasks
+**Standard Weather Types:**
 
-### Modifying Weather Data
+- Clear Skies, Light Rain, Heavy Rain, Storm
+- Hot, Heatwave
+- Snow, Blizzard
+- Fog
 
-Edit seasonal conditions in `weatherService.js`:
+Each type has mechanical impacts defined in `weatherService.js`:
 
-- Add/remove weather conditions per season
-- Adjust seasonal date ranges
-- Modify seeded random generation
+- Travel speed multipliers (road/off-road)
+- March restrictions (forced/night)
+- Visibility and river fording
 
-### Testing Locally
+## Region Mapping
+
+Region IDs are built from Google Sheets columns: `Current Continent` + ` ` + `Region`
+
+Example: Continent "Patlania" + Region "Southern Point" → "Patlania Southern Point"
+
+This must match the key in `regions.json` for weather probabilities.
+
+## Recipient Override
+
+Diplomats can have a "Recipient Override" that points to a commander name. When set, the diplomat receives weather for the overriding commander's region instead of their own.
+
+## Testing Locally
 
 ```bash
 npm test          # runs test-webhook.js (daily weather)
 npm run test-weekly  # runs test-weekly.js (weekly forecast)
 ```
 
-### Error Handling
-
-- Wrap async operations in try-catch
-- Use logger for all output
-- Fail gracefully on webhook errors
-
 ## Key Features
 
-- **Deterministic**: Same date = same weather
-- **Seasonal**: Weather varies by time of year
-- **Dual Webhooks**: Daily updates for players, weekly forecasts for GMs
+- **Deterministic**: Same date + region = same weather
+- **Seasonal**: Weather varies by time of year with weighted probabilities
+- **Dual Webhooks**: Daily updates for players, consolidated weekly forecasts for GMs
 - **Dynamic Emojis**: Weather-appropriate emojis that differ for day/night
-- **Modular**: Easy to extend with new features
+- **Mechanical Impacts**: Travel speed, march restrictions, visibility effects
+- **Google Sheets Integration**: Webhook URLs fetched dynamically from spreadsheet

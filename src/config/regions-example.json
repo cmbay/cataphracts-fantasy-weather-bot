@@ -1,77 +1,42 @@
 {
   "regions": {
-    "temperate_coastal": {
-      "name": "Temperate Coastal Region",
+    "Example Region": {
+      "name": "Example Region",
       "seasonalWeather": {
         "spring": {
           "conditions": [
-            "Overcast with drizzle",
-            "Partly cloudy with occasional showers",
-            "Bright with scattered clouds",
-            "Mild and sunny",
-            "Light rain",
-            "Fresh with morning mist",
-            "Cool and breezy"
-          ],
-          "mechanicalImpacts": {
-            "Overcast with drizzle": "Scouting range reduced by 1 hex",
-            "Partly cloudy with occasional showers": "Scouting range reduced by 1 hex",
-            "Light rain": "Scouting range reduced by 1 hex",
-            "Fresh with morning mist": "Scouting range reduced by 1 hex"
-          }
+            { "result": "Clear Skies", "weight": 4 },
+            { "result": "Light Rain", "weight": 3 },
+            { "result": "Heavy Rain", "weight": 2 },
+            { "result": "Fog", "weight": 1 }
+          ]
         },
         "summer": {
           "conditions": [
-            "Partly cloudy",
-            "Warm and sunny",
-            "Light breeze with sunshine",
-            "Hazy sunshine",
-            "Occasional summer showers",
-            "Thunderstorms in the afternoon",
-            "Hot with clear skies"
-          ],
-          "mechanicalImpacts": {
-            "Occasional summer showers": "Scouting range reduced by 1 hex",
-            "Thunderstorms in the afternoon": "Movement speed reduced by 1 hex, scouting range reduced by 2 hexes, -1 to battle rolls"
-          }
+            { "result": "Clear Skies", "weight": 3 },
+            { "result": "Hot", "weight": 4 },
+            { "result": "Heatwave", "weight": 1 },
+            { "result": "Storm", "weight": 2 }
+          ]
         },
         "autumn": {
           "conditions": [
-            "Grey skies with drizzle",
-            "Overcast with light rain",
-            "Misty and damp",
-            "Cool and crisp",
-            "Foggy morning clearing to sun",
-            "Windy with scattered clouds",
-            "Blustery with heavy showers"
-          ],
-          "mechanicalImpacts": {
-            "Grey skies with drizzle": "Scouting range reduced by 1 hex",
-            "Overcast with light rain": "Scouting range reduced by 1 hex",
-            "Misty and damp": "Scouting range reduced by 1 hex",
-            "Foggy morning clearing to sun": "Scouting range reduced by 1 hex",
-            "Blustery with heavy showers": "Movement speed reduced by 1 hex, scouting range reduced by 2 hexes, -1 to battle rolls"
-          }
+            { "result": "Clear Skies", "weight": 3 },
+            { "result": "Light Rain", "weight": 3 },
+            { "result": "Heavy Rain", "weight": 2 },
+            { "result": "Fog", "weight": 2 }
+          ]
         },
         "winter": {
           "conditions": [
-            "Cold rain",
-            "Cold and frosty",
-            "Thick fog",
-            "Overcast with sleet",
-            "Bright but freezing",
-            "Light snow flurries",
-            "Icy and treacherous"
-          ],
-          "mechanicalImpacts": {
-            "Cold rain": "Scouting range reduced by 1 hex",
-            "Thick fog": "Scouting range reduced by 1 hex",
-            "Overcast with sleet": "Movement speed reduced by 1 hex, scouting range reduced by 2 hexes, -1 to battle rolls",
-            "Light snow flurries": "Scouting range reduced by 1 hex",
-            "Icy and treacherous": "Movement, scouting, and foraging are all impossible"
-          }
+            { "result": "Clear Skies", "weight": 2 },
+            { "result": "Snow", "weight": 4 },
+            { "result": "Blizzard", "weight": 2 },
+            { "result": "Fog", "weight": 2 }
+          ]
         }
       }
     }
-  }
+  },
+  "_comment": "Region IDs must match 'Current Continent' + ' ' + 'Region' from Google Sheets. Valid weather types: Clear Skies, Light Rain, Heavy Rain, Storm, Hot, Heatwave, Snow, Blizzard, Fog"
 }

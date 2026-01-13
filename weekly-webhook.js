@@ -133,11 +133,20 @@ async function sendConsolidatedWeeklyForecastWebhook() {
     for (const region of configuredRegions) {
       try {
         const regionConfig = await getRegionConfig(region.id);
-        const weeklyForecast = getRegionalWeeklyForecast(regionConfig);
 
         if (regionConfig.name) {
           consolidatedMessage += `🌍 **${regionConfig.name}**\n\n`;
         }
+
+        // Check if region has weather configuration
+        if (!regionConfig.hasWeatherConfig || !regionConfig.seasonalWeather) {
+          consolidatedMessage += `⚠️ *No weather configuration found for region "${region.id}"*\n`;
+          consolidatedMessage += `Please add this region to regions.json to receive weather forecasts.\n\n`;
+          consolidatedMessage += "─────────────────────────────\n\n";
+          continue;
+        }
+
+        const weeklyForecast = getRegionalWeeklyForecast(regionConfig);
 
         weeklyForecast.forEach((dayWeather, index) => {
           const isToday = index === 0;

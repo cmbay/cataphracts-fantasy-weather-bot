@@ -16,27 +16,40 @@ async function sendRegionalWeatherWebhook(regionId) {
     const regionConfig = await getRegionConfig(regionId);
     logger.info(`Sending weather update for region: ${regionConfig.name}`);
 
-    // Get weather data for this region (single condition + impacts)
-    const weather = getRegionalWeatherUpdate(regionConfig);
+    let messageContent;
+    let weather = null;
 
-    // Build the weather message content
-    let messageContent =
-      `📅 **Weather Update${
-        regionConfig.name ? ` - ${regionConfig.name}` : ""
-      }**\n` +
-      `**Date:** ${weather.date}\n` +
-      `**Season:** ${
-        weather.season.charAt(0).toUpperCase() + weather.season.slice(1)
-      }\n` +
-      `${getWeatherEmoji(weather.condition, false)} **Weather:** ${
-        weather.condition
-      }\n`;
+    // Check if region has weather configuration
+    if (!regionConfig.hasWeatherConfig || !regionConfig.seasonalWeather) {
+      // Post warning about unknown region
+      logger.warn(`Region "${regionId}" has no weather configuration`);
+      messageContent =
+        `⚠️ **Weather Update - ${regionConfig.name}**\n` +
+        `**Warning:** No weather configuration found for region "${regionId}"\n` +
+        `Please add this region to regions.json to receive weather updates.`;
+    } else {
+      // Get weather data for this region (single condition + impacts)
+      weather = getRegionalWeatherUpdate(regionConfig);
 
-    // Add mechanical impacts if any
-    if (Array.isArray(weather.impacts) && weather.impacts.length > 0) {
-      weather.impacts.forEach((impact) => {
-        messageContent += `⚠️ ${impact}\n`;
-      });
+      // Build the weather message content
+      messageContent =
+        `📅 **Weather Update${
+          regionConfig.name ? ` - ${regionConfig.name}` : ""
+        }**\n` +
+        `**Date:** ${weather.date}\n` +
+        `**Season:** ${
+          weather.season.charAt(0).toUpperCase() + weather.season.slice(1)
+        }\n` +
+        `${getWeatherEmoji(weather.condition, false)} **Weather:** ${
+          weather.condition
+        }\n`;
+
+      // Add mechanical impacts if any
+      if (Array.isArray(weather.impacts) && weather.impacts.length > 0) {
+        weather.impacts.forEach((impact) => {
+          messageContent += `⚠️ ${impact}\n`;
+        });
+      }
     }
 
     // Format the message for Discord webhook
@@ -170,10 +183,13 @@ async function sendAllRegionalWebhooks() {
       try {
         // Get weather data for this region
         const regionConfig = await getRegionConfig(region.id);
-        const weather = getRegionalWeatherUpdate(regionConfig);
 
-        // Store for Google Sheets update, using region name as key
-        weatherByRegionName[regionConfig.name] = weather.condition;
+        // Only add to Google Sheets if region has weather config
+        if (regionConfig.hasWeatherConfig && regionConfig.seasonalWeather) {
+          const weather = getRegionalWeatherUpdate(regionConfig);
+          // Store for Google Sheets update, using region name as key
+          weatherByRegionName[regionConfig.name] = weather.condition;
+        }
 
         await sendRegionalWeatherWebhook(region.id);
         results.push({ regionId: region.id, success: true });
