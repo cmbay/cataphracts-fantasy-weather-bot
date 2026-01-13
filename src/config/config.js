@@ -130,6 +130,32 @@ async function loadWebhookConfig() {
 }
 
 /**
+ * Find weather config for a region ID, with fallback matching
+ * Handles cases where sheet has "Patlania Frostborough Region" but config has "Patlania Frostborough"
+ * @param {string} regionId - Region ID from Google Sheets
+ * @returns {object|null} Weather config object or null if not found
+ */
+function findWeatherConfig(regionId) {
+  if (!regionsConfig.regions) return null;
+
+  // Direct match
+  if (regionsConfig.regions[regionId]) {
+    return regionsConfig.regions[regionId];
+  }
+
+  // Try without " Region" suffix (e.g., "Patlania Frostborough Region" -> "Patlania Frostborough")
+  if (regionId.endsWith(" Region")) {
+    const withoutSuffix = regionId.slice(0, -7); // Remove " Region"
+    if (regionsConfig.regions[withoutSuffix]) {
+      console.log(`[CONFIG] Matched "${regionId}" to config "${withoutSuffix}"`);
+      return regionsConfig.regions[withoutSuffix];
+    }
+  }
+
+  return null;
+}
+
+/**
  * Get all configured regions that have both:
  * - Weather probabilities defined in regions.json
  * - At least one webhook URL from Google Sheets
@@ -147,15 +173,12 @@ async function getConfiguredRegions() {
     config.webhooksByRegion
   )) {
     if (webhookUrls && webhookUrls.length > 0) {
-      const hasWeatherConfig =
-        regionsConfig.regions && regionsConfig.regions[regionId];
+      const weatherConfig = findWeatherConfig(regionId);
       regions.push({
         id: regionId,
-        name: hasWeatherConfig
-          ? regionsConfig.regions[regionId].name
-          : regionId,
+        name: weatherConfig ? weatherConfig.name : regionId,
         webhookUrls,
-        hasWeatherConfig,
+        hasWeatherConfig: !!weatherConfig,
       });
     }
   }
@@ -177,10 +200,8 @@ async function getRegionConfig(regionId) {
     throw new Error(`No webhook URLs configured for region '${regionId}'`);
   }
 
-  // Get weather config (may be undefined for unknown regions)
-  const weatherConfig = regionsConfig.regions
-    ? regionsConfig.regions[regionId]
-    : null;
+  // Get weather config with fallback matching
+  const weatherConfig = findWeatherConfig(regionId);
 
   return {
     id: regionId,
