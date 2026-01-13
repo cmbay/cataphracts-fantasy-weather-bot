@@ -49,4 +49,6 @@ jobs:
           # Google Sheets configuration (webhook URLs fetched from Commander/Diplomat Database sheets)
           GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}
           GOOGLE_SPREADSHEET_ID: ${{ secrets.GOOGLE_SPREADSHEET_ID }}
+          # Regional weather configuration (weather probabilities per region)
+          REGIONS_CONFIG: ${{ secrets.REGIONS_CONFIG }}
         run: npm start

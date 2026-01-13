@@ -20,10 +20,44 @@ let webhookConfig = null;
 let webhookConfigPromise = null;
 
 /**
- * Load regions configuration from local file
+ * Normalize region IDs by trimming whitespace from keys
+ */
+function normalizeRegionKeys(config) {
+  if (config.regions) {
+    const normalizedRegions = {};
+    for (const [key, value] of Object.entries(config.regions)) {
+      const trimmedKey = key.trim();
+      if (trimmedKey !== key) {
+        console.log(
+          `[CONFIG] Normalized region key: "${key}" -> "${trimmedKey}"`
+        );
+      }
+      normalizedRegions[trimmedKey] = value;
+    }
+    config.regions = normalizedRegions;
+  }
+  return config;
+}
+
+/**
+ * Load regions configuration from environment variable or local file
  * This contains weather probabilities for each region
  */
 function loadRegionsConfig() {
+  // First, check for REGIONS_CONFIG environment variable (used in GitHub Actions)
+  if (process.env.REGIONS_CONFIG) {
+    try {
+      const config = JSON.parse(process.env.REGIONS_CONFIG);
+      console.log("[CONFIG] Loaded regions from REGIONS_CONFIG environment variable");
+      return normalizeRegionKeys(config);
+    } catch (error) {
+      console.error(
+        `[CONFIG] Failed to parse REGIONS_CONFIG: ${error.message}`
+      );
+    }
+  }
+
+  // Fall back to local file
   const possiblePaths = [
     path.join(process.cwd(), "regions.json"),
     path.join(process.cwd(), "config", "regions.json"),
@@ -37,23 +71,7 @@ function loadRegionsConfig() {
       if (fs.existsSync(configPath)) {
         const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
         console.log(`[CONFIG] Loaded regions.json from: ${configPath}`);
-
-        // Normalize region IDs by trimming whitespace from keys
-        if (config.regions) {
-          const normalizedRegions = {};
-          for (const [key, value] of Object.entries(config.regions)) {
-            const trimmedKey = key.trim();
-            if (trimmedKey !== key) {
-              console.log(
-                `[CONFIG] Normalized region key: "${key}" -> "${trimmedKey}"`
-              );
-            }
-            normalizedRegions[trimmedKey] = value;
-          }
-          config.regions = normalizedRegions;
-        }
-
-        return config;
+        return normalizeRegionKeys(config);
       }
     } catch (error) {
       console.warn(
