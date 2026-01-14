@@ -48,7 +48,9 @@ function loadRegionsConfig() {
   if (process.env.REGIONS_CONFIG) {
     try {
       const config = JSON.parse(process.env.REGIONS_CONFIG);
-      console.log("[CONFIG] Loaded regions from REGIONS_CONFIG environment variable");
+      console.log(
+        "[CONFIG] Loaded regions from REGIONS_CONFIG environment variable"
+      );
       return normalizeRegionKeys(config);
     } catch (error) {
       console.error(
@@ -147,7 +149,9 @@ function findWeatherConfig(regionId) {
   if (regionId.endsWith(" Region")) {
     const withoutSuffix = regionId.slice(0, -7); // Remove " Region"
     if (regionsConfig.regions[withoutSuffix]) {
-      console.log(`[CONFIG] Matched "${regionId}" to config "${withoutSuffix}"`);
+      console.log(
+        `[CONFIG] Matched "${regionId}" to config "${withoutSuffix}"`
+      );
       return regionsConfig.regions[withoutSuffix];
     }
   }

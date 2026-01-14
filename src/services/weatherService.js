@@ -210,6 +210,15 @@ function formatImpacts(impactData) {
     impacts.push("Cannot ford rivers");
   }
 
+  // Battle and scouting impacts based on weather type
+  if (impactData.type === "Bad") {
+    impacts.push("-1 to battle rolls");
+    impacts.push("Scouting range reduced by 1 hex");
+  } else if (impactData.type === "Very Bad") {
+    impacts.push("-1 to battle rolls");
+    impacts.push("Scouting range reduced by 2 hexes");
+  }
+
   // Special effects
   if (impactData.special) {
     impacts.push(impactData.special);
