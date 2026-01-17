@@ -168,6 +168,16 @@ async function sendConsolidatedWeeklyForecastWebhook() {
             });
           }
 
+          // Add special comet event if applicable
+          if (dayWeather.hasComet && dayWeather.cometEvent) {
+            consolidatedMessage += `\n`;
+            consolidatedMessage += `☄️✨ **CELESTIAL EVENT: ${dayWeather.cometEvent.name}** ✨☄️\n`;
+            consolidatedMessage += `\n`;
+            consolidatedMessage += `*${dayWeather.cometEvent.description}*\n`;
+            consolidatedMessage += `\n`;
+            consolidatedMessage += `🌟 **Effect:** ${dayWeather.cometEvent.impact}\n`;
+          }
+
           consolidatedMessage += `\n`;
         });
 

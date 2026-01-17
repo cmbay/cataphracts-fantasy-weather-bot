@@ -50,6 +50,16 @@ async function sendRegionalWeatherWebhook(regionId) {
           messageContent += `⚠️ ${impact}\n`;
         });
       }
+
+      // Add special comet event if applicable
+      if (weather.hasComet && weather.cometEvent) {
+        messageContent += `\n`;
+        messageContent += `☄️✨ **CELESTIAL EVENT: ${weather.cometEvent.name}** ✨☄️\n`;
+        messageContent += `\n`;
+        messageContent += `*${weather.cometEvent.description}*\n`;
+        messageContent += `\n`;
+        messageContent += `🌟 **Effect:** ${weather.cometEvent.impact}\n`;
+      }
     }
 
     // Format the message for Discord webhook

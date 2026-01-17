@@ -15,6 +15,42 @@ const Weather = Object.freeze({
   FOG: "Fog",
 });
 
+// ----------------------
+// Special Event: One-off Comet
+// A rare celestial event visible across all regions on a specific date
+// ----------------------
+const COMET_DATE = {
+  year: 2026,
+  month: 6, // June (1-indexed)
+  day: 15,
+};
+
+/**
+ * Check if a given date is the comet date
+ * @param {Date} date - The date to check
+ * @returns {boolean} True if this is the comet date
+ */
+function isCometDate(date) {
+  return (
+    date.getUTCFullYear() === COMET_DATE.year &&
+    date.getUTCMonth() + 1 === COMET_DATE.month &&
+    date.getUTCDate() === COMET_DATE.day
+  );
+}
+
+/**
+ * Get comet event details if applicable
+ * @returns {object} Comet event info
+ */
+function getCometEventInfo() {
+  return {
+    name: "Gunhilde",
+    description:
+      "The comet Gunhilde traces a bright green line across the sky. Everyone who sees it feels uplifted.",
+    impact: "Recover 1 Morale",
+  };
+}
+
 // All weather types as an array (for validation)
 const ALL_WEATHER_TYPES = Object.values(Weather);
 
@@ -531,6 +567,31 @@ const getWeatherForDate = (
   const seasonData = seasonalWeatherConfig[season];
   if (!seasonData) throw new Error(`No weather data for season '${season}'`);
 
+  // Check for special comet event - overrides normal weather
+  const hasComet = isCometDate(date);
+  if (hasComet) {
+    const formattedDate = date.toLocaleDateString("en-US", {
+      month: "long",
+      day: "numeric",
+      timeZone: "UTC",
+    });
+    const dayOfWeek = date.toLocaleDateString("en-US", {
+      weekday: "long",
+      timeZone: "UTC",
+    });
+
+    return {
+      date: formattedDate,
+      dayOfWeek,
+      season,
+      condition: Weather.CLEAR_SKIES,
+      impacts: [],
+      impactData: WEATHER_IMPACTS[Weather.CLEAR_SKIES],
+      hasComet: true,
+      cometEvent: getCometEventInfo(),
+    };
+  }
+
   // Get epoch info for this date
   const epochInfo = getEpochInfo(date, regionId);
   const { epochNumber, epochLength, dayInEpoch } = epochInfo;
@@ -597,6 +658,8 @@ const getWeatherForDate = (
     condition,
     impacts,
     impactData,
+    hasComet: false,
+    cometEvent: null,
   };
 };
 
@@ -670,4 +733,7 @@ module.exports = {
   getRegionalWeatherUpdate,
   getRegionalWeeklyForecast,
   WEATHER_IMPACTS,
+  isCometDate,
+  getCometEventInfo,
+  COMET_DATE,
 };
