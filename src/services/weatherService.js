@@ -21,8 +21,8 @@ const Weather = Object.freeze({
 // ----------------------
 const COMET_DATE = {
   year: 2026,
-  month: 6, // June (1-indexed)
-  day: 15,
+  month: 5, // May (1-indexed)
+  day: 14,
 };
 
 /**
@@ -258,7 +258,7 @@ function getEpochInfo(date, regionId) {
 
   // Calculate actual epochStart for startEpochNum by simulating epochs from 0
   for (let e = 0; e < startEpochNum; e++) {
-    const epochSeed = e * 7919 + regionOffset;
+    const epochSeed = e * 8861 + regionOffset;
     const epochRng = seededRandom(epochSeed);
     const epochLength = 2 + Math.floor(epochRng() * 4);
     epochStart += epochLength;
@@ -267,7 +267,7 @@ function getEpochInfo(date, regionId) {
   // Scan forward to find the epoch containing targetDay
   while (true) {
     // Determine this epoch's length using seeded RNG (2-5 days)
-    const epochSeed = epochNumber * 7919 + regionOffset;
+    const epochSeed = epochNumber * 8861 + regionOffset;
     const epochRng = seededRandom(epochSeed);
     const epochLength = 2 + Math.floor(epochRng() * 4); // 2, 3, 4, or 5 days
 
@@ -301,7 +301,7 @@ function getEpochInfo(date, regionId) {
 // ----------------------
 // Get the base weather for an epoch (before transition smoothing)
 function getEpochBaseWeather(epochNumber, seasonConfig, regionId) {
-  const epochSeed = epochNumber * 31337 + hashRegion(regionId);
+  const epochSeed = epochNumber * 48271 + hashRegion(regionId);
   const rng = seededRandom(epochSeed);
   return rollFromTable(rng, seasonConfig.conditions);
 }
@@ -508,8 +508,8 @@ function formatImpacts(impactData) {
 // We iterate forward from this epoch with a known starting weather.
 // Epoch 0 = day 0 (Jan 1, 1970), but we use a more recent anchor for efficiency.
 // Anchor epoch ~5765 corresponds to roughly Jan 1, 2020.
-const ANCHOR_EPOCH = 5765;
-const ANCHOR_WEATHER = Weather.CLEAR_SKIES;
+const ANCHOR_EPOCH = 5900;
+const ANCHOR_WEATHER = Weather.LIGHT_RAIN;
 
 // ----------------------
 // Get the effective weather at the end of an epoch (what we'd actually see)
